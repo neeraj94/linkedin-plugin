@@ -5,6 +5,7 @@ class PopupController {
     this.isRunning = false;
     this.stats = {
       postsFound: 0,
+      postsLiked: 0,
       commentsPosted: 0,
       errors: 0
     };
@@ -21,10 +22,17 @@ class PopupController {
       saveKey: document.getElementById('saveKey'),
       commentStyle: document.getElementById('commentStyle'),
       maxPosts: document.getElementById('maxPosts'),
+      enableLikes: document.getElementById('enableLikes'),
+      enableComments: document.getElementById('enableComments'),
+      maxLikes: document.getElementById('maxLikes'),
+      maxComments: document.getElementById('maxComments'),
+      delayMin: document.getElementById('delayMin'),
+      delayMax: document.getElementById('delayMax'),
       startBot: document.getElementById('startBot'),
       stopBot: document.getElementById('stopBot'),
       status: document.getElementById('status'),
       postsFound: document.getElementById('postsFound'),
+      postsLiked: document.getElementById('postsLiked'),
       commentsPosted: document.getElementById('commentsPosted'),
       errors: document.getElementById('errors'),
       logContainer: document.getElementById('logContainer')
@@ -37,6 +45,12 @@ class PopupController {
         'openaiApiKey',
         'commentStyle',
         'maxPosts',
+        'enableLikes',
+        'enableComments',
+        'maxLikes',
+        'maxComments',
+        'delayMin',
+        'delayMax',
         'stats'
       ]);
 
@@ -50,6 +64,30 @@ class PopupController {
 
       if (result.maxPosts) {
         this.elements.maxPosts.value = result.maxPosts;
+      }
+
+      if (result.enableLikes !== undefined) {
+        this.elements.enableLikes.checked = result.enableLikes;
+      }
+
+      if (result.enableComments !== undefined) {
+        this.elements.enableComments.checked = result.enableComments;
+      }
+
+      if (result.maxLikes) {
+        this.elements.maxLikes.value = result.maxLikes;
+      }
+
+      if (result.maxComments) {
+        this.elements.maxComments.value = result.maxComments;
+      }
+
+      if (result.delayMin) {
+        this.elements.delayMin.value = result.delayMin;
+      }
+
+      if (result.delayMax) {
+        this.elements.delayMax.value = result.delayMax;
       }
 
       if (result.stats) {
@@ -69,6 +107,12 @@ class PopupController {
     // Save settings on change
     this.elements.commentStyle.addEventListener('change', () => this.saveSettings());
     this.elements.maxPosts.addEventListener('change', () => this.saveSettings());
+    this.elements.enableLikes.addEventListener('change', () => this.saveSettings());
+    this.elements.enableComments.addEventListener('change', () => this.saveSettings());
+    this.elements.maxLikes.addEventListener('change', () => this.saveSettings());
+    this.elements.maxComments.addEventListener('change', () => this.saveSettings());
+    this.elements.delayMin.addEventListener('change', () => this.saveSettings());
+    this.elements.delayMax.addEventListener('change', () => this.saveSettings());
   }
 
   setupMessageListener() {
@@ -115,7 +159,13 @@ class PopupController {
     try {
       await chrome.storage.sync.set({
         commentStyle: this.elements.commentStyle.value,
-        maxPosts: parseInt(this.elements.maxPosts.value)
+        maxPosts: parseInt(this.elements.maxPosts.value),
+        enableLikes: this.elements.enableLikes.checked,
+        enableComments: this.elements.enableComments.checked,
+        maxLikes: parseInt(this.elements.maxLikes.value),
+        maxComments: parseInt(this.elements.maxComments.value),
+        delayMin: parseInt(this.elements.delayMin.value),
+        delayMax: parseInt(this.elements.delayMax.value)
       });
     } catch (error) {
       this.addLog('Error saving settings: ' + error.message, 'error');
@@ -145,7 +195,13 @@ class PopupController {
         config: {
           apiKey: apiKey,
           commentStyle: this.elements.commentStyle.value,
-          maxPosts: parseInt(this.elements.maxPosts.value)
+          maxPosts: parseInt(this.elements.maxPosts.value),
+          enableLikes: this.elements.enableLikes.checked,
+          enableComments: this.elements.enableComments.checked,
+          maxLikes: parseInt(this.elements.maxLikes.value),
+          maxComments: parseInt(this.elements.maxComments.value),
+          delayMin: parseInt(this.elements.delayMin.value),
+          delayMax: parseInt(this.elements.delayMax.value)
         }
       });
 
@@ -207,6 +263,7 @@ class PopupController {
 
   updateStatsDisplay() {
     this.elements.postsFound.textContent = this.stats.postsFound || 0;
+    this.elements.postsLiked.textContent = this.stats.postsLiked || 0;
     this.elements.commentsPosted.textContent = this.stats.commentsPosted || 0;
     this.elements.errors.textContent = this.stats.errors || 0;
   }

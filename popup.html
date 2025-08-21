@@ -30,7 +30,41 @@
       
       <div class="form-group">
         <label for="maxPosts">Max Posts to Process:</label>
-        <input type="number" id="maxPosts" value="10" min="1" max="20">
+        <input type="number" id="maxPosts" value="10" min="1" max="50">
+      </div>
+      
+      <div class="form-group">
+        <label>Actions to Perform:</label>
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="enableLikes" checked>
+            Like Posts
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="enableComments" checked>
+            Comment on Posts
+          </label>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="maxLikes">Max Posts to Like:</label>
+        <input type="number" id="maxLikes" value="15" min="0" max="100">
+      </div>
+      
+      <div class="form-group">
+        <label for="maxComments">Max Posts to Comment:</label>
+        <input type="number" id="maxComments" value="5" min="0" max="50">
+      </div>
+      
+      <div class="form-group">
+        <label for="delayMin">Minimum Delay (seconds):</label>
+        <input type="number" id="delayMin" value="2" min="1" max="30">
+      </div>
+      
+      <div class="form-group">
+        <label for="delayMax">Maximum Delay (seconds):</label>
+        <input type="number" id="delayMax" value="8" min="2" max="60">
       </div>
     </div>
     
@@ -43,6 +77,10 @@
       <div class="stat-item">
         <span class="stat-label">Posts Found:</span>
         <span id="postsFound">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Posts Liked:</span>
+        <span id="postsLiked">0</span>
       </div>
       <div class="stat-item">
         <span class="stat-label">Comments Posted:</span>

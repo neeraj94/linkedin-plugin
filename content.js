@@ -6,6 +6,7 @@ class LinkedInBot {
     this.config = {};
     this.stats = {
       postsFound: 0,
+      postsLiked: 0,
       commentsPosted: 0,
       errors: 0
     };
@@ -80,6 +81,8 @@ class LinkedInBot {
     this.log(`Found ${posts.length} posts to process`);
     this.updateStats({ postsFound: posts.length });
     
+    let likesCount = 0;
+    let commentsCount = 0;
     let processedCount = 0;
     
     for (const post of posts) {
@@ -94,20 +97,45 @@ class LinkedInBot {
       }
 
       try {
-        await this.processPost(post);
+        const actions = [];
+        
+        // Determine what actions to perform on this post
+        if (this.config.enableLikes && likesCount < this.config.maxLikes) {
+          actions.push('like');
+        }
+        
+        if (this.config.enableComments && commentsCount < this.config.maxComments) {
+          actions.push('comment');
+        }
+
+        if (actions.length === 0) {
+          this.log('All action limits reached, stopping processing');
+          break;
+        }
+
+        const result = await this.processPost(post, actions);
+        
+        if (result.liked) likesCount++;
+        if (result.commented) commentsCount++;
+        
         processedCount++;
         
-        // Add delay between posts to avoid rate limiting
-        await this.delay(CONFIG.DELAYS.BETWEEN_POSTS);
+        // Add random human-like delay between posts
+        const delay = this.getRandomDelay();
+        this.log(`Waiting ${delay}s before next post...`);
+        await this.delay(delay * 1000);
         
       } catch (error) {
         this.log(`Error processing post: ${error.message}`, 'error');
         this.updateStats({ errors: this.stats.errors + 1 });
+        
+        // Add delay even on error to avoid rapid retries
+        await this.delay(this.getRandomDelay() * 1000);
       }
     }
 
-    this.log(`Completed processing ${processedCount} posts`);
-    this.updateStatus(`Completed - Processed ${processedCount} posts`);
+    this.log(`Completed processing ${processedCount} posts (${likesCount} liked, ${commentsCount} commented)`);
+    this.updateStatus(`Completed - ${processedCount} processed, ${likesCount} liked, ${commentsCount} commented`);
   }
 
   async findFeedPosts() {
@@ -259,6 +287,64 @@ class LinkedInBot {
            postElement.querySelector('.social-actions-button:nth-child(2)');
   }
 
+  findLikeButton(postElement) {
+    // Try multiple selectors for like buttons
+    return postElement.querySelector('[aria-label*="Like"]') ||
+           postElement.querySelector('[aria-label*="like"]') ||
+           postElement.querySelector('button[data-control-name*="like"]') ||
+           postElement.querySelector('.social-actions-button[aria-label*="Like"]') ||
+           postElement.querySelector('.feed-shared-social-action-bar button[aria-label*="Like"]') ||
+           postElement.querySelector('.reactions-react-button') ||
+           postElement.querySelector('.feed-shared-social-action-bar .artdeco-button:first-child') ||
+           postElement.querySelector('.social-actions-button:first-child');
+  }
+
+  async likePost(postData) {
+    try {
+      const likeButton = this.findLikeButton(postData.element);
+      
+      if (!likeButton) {
+        throw new Error('Like button not found');
+      }
+
+      // Check if already liked
+      const isLiked = likeButton.getAttribute('aria-pressed') === 'true' ||
+                     likeButton.classList.contains('artdeco-button--primary') ||
+                     likeButton.querySelector('[data-test-icon="thumbs-up-filled-icon"]') ||
+                     likeButton.textContent.toLowerCase().includes('liked');
+
+      if (isLiked) {
+        this.log(`Post by ${postData.author} already liked, skipping`);
+        return;
+      }
+
+      // Click the like button
+      likeButton.click();
+      await this.delay(this.getRandomDelay(0.3, 1) * 1000);
+
+      // Verify the like was successful
+      const nowLiked = likeButton.getAttribute('aria-pressed') === 'true' ||
+                      likeButton.classList.contains('artdeco-button--primary') ||
+                      likeButton.querySelector('[data-test-icon="thumbs-up-filled-icon"]');
+
+      if (!nowLiked) {
+        this.log(`Warning: Could not verify like on post by ${postData.author}`);
+      }
+
+    } catch (error) {
+      throw new Error(`Failed to like post: ${error.message}`);
+    }
+  }
+
+  getRandomDelay(min = null, max = null) {
+    // Use config delays if no specific range provided
+    const minDelay = min !== null ? min : this.config.delayMin || 2;
+    const maxDelay = max !== null ? max : this.config.delayMax || 8;
+    
+    // Generate random delay between min and max
+    return Math.random() * (maxDelay - minDelay) + minDelay;
+  }
+
   generatePostId(content, element) {
     // Create a simple hash from content and element position
     const text = content.substring(0, 100);
@@ -266,24 +352,53 @@ class LinkedInBot {
     return btoa(text + position).replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
   }
 
-  async processPost(postData) {
-    this.log(`Processing post by ${postData.author}...`);
+  async processPost(postData, actions) {
+    this.log(`Processing post by ${postData.author} (${actions.join(', ')})...`);
     this.updateStatus(`Processing post by ${postData.author}`);
 
-    // Generate comment
-    const comment = await this.generateComment(postData.content);
-    
-    if (!comment) {
-      throw new Error('Failed to generate comment');
+    const result = { liked: false, commented: false };
+
+    // Scroll to post
+    postData.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await this.delay(this.getRandomDelay(1, 2) * 1000);
+
+    // Process actions in random order to appear more human
+    const shuffledActions = [...actions].sort(() => Math.random() - 0.5);
+
+    for (const action of shuffledActions) {
+      if (!this.isRunning) break;
+
+      try {
+        if (action === 'like') {
+          await this.likePost(postData);
+          result.liked = true;
+          this.updateStats({ postsLiked: this.stats.postsLiked + 1 });
+          this.log(`✓ Liked post by ${postData.author}`, 'success');
+          
+          // Random delay between actions
+          if (shuffledActions.length > 1) {
+            await this.delay(this.getRandomDelay(0.5, 2) * 1000);
+          }
+        }
+
+        if (action === 'comment') {
+          const comment = await this.generateComment(postData.content);
+          
+          if (comment) {
+            await this.postComment(postData, comment);
+            result.commented = true;
+            this.updateStats({ commentsPosted: this.stats.commentsPosted + 1 });
+            this.log(`✓ Commented on post by ${postData.author}: "${comment.substring(0, 30)}..."`, 'success');
+          } else {
+            this.log(`Failed to generate comment for post by ${postData.author}`, 'error');
+          }
+        }
+      } catch (error) {
+        this.log(`Error with ${action} on post by ${postData.author}: ${error.message}`, 'error');
+      }
     }
 
-    this.log(`Generated comment: "${comment.substring(0, 50)}..."`);
-
-    // Post the comment
-    await this.postComment(postData, comment);
-    
-    this.updateStats({ commentsPosted: this.stats.commentsPosted + 1 });
-    this.log(`Successfully commented on post by ${postData.author}`, 'success');
+    return result;
   }
 
   async generateComment(postContent) {

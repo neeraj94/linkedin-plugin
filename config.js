@@ -39,9 +39,15 @@ const CONFIG = {
   // Default settings
   DEFAULTS: {
     MAX_POSTS: 10,
+    MAX_LIKES: 15,
+    MAX_COMMENTS: 5,
     COMMENT_STYLE: 'professional',
     COMMENT_MIN_LENGTH: 20,
-    COMMENT_MAX_LENGTH: 80
+    COMMENT_MAX_LENGTH: 80,
+    DELAY_MIN: 2,
+    DELAY_MAX: 8,
+    ENABLE_LIKES: true,
+    ENABLE_COMMENTS: true
   },
 
   // Error messages
