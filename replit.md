@@ -4,6 +4,15 @@
 
 This is a Chrome browser extension that automates LinkedIn engagement through AI-generated comments. The bot scans LinkedIn feeds, extracts post content, generates contextually appropriate comments using OpenAI's GPT-4o model, and automatically posts them to increase user engagement on the platform. The extension uses a human-like interaction pattern with configurable delays and comment styles to avoid detection as an automated tool.
 
+## Recent Changes (August 20, 2025)
+
+- Fixed browser compatibility issues (removed Node.js process.env usage)
+- Updated LinkedIn DOM selectors for current site structure  
+- Enhanced content extraction with fallback methods
+- Improved comment posting with better rich text editor support
+- Added comprehensive debugging and logging
+- Created test page for API key validation
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

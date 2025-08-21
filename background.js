@@ -22,8 +22,8 @@ class BackgroundService {
     try {
       const { postContent, commentStyle, apiKey } = message;
       
-      // Use environment variable if available, fallback to provided key
-      const openaiKey = process.env.OPENAI_API_KEY || apiKey;
+      // Use provided key (environment variables not available in browser context)
+      const openaiKey = apiKey;
       
       if (!openaiKey || !openaiKey.startsWith('sk-')) {
         throw new Error('Invalid OpenAI API key');

@@ -111,11 +111,18 @@ class LinkedInBot {
   }
 
   async findFeedPosts() {
-    // Wait for feed to load
-    await this.waitForElement('.feed-shared-update-v2', 5000);
+    // Wait for feed to load - try multiple selectors
+    const feedLoaded = await this.waitForElement('.feed-shared-update-v2, .feed-shared-update-v2__container, [data-test-id="main-feed-activity-card"]', 5000);
+    
+    if (!feedLoaded) {
+      this.log('Feed not loaded, trying alternative selectors');
+    }
     
     const posts = [];
-    const postElements = document.querySelectorAll('.feed-shared-update-v2');
+    // Try multiple selectors for feed posts
+    const postElements = document.querySelectorAll('.feed-shared-update-v2, [data-test-id="main-feed-activity-card"], .feed-shared-update-v2__container');
+    
+    this.log(`Found ${postElements.length} potential post elements`);
     
     for (const postElement of postElements) {
       if (posts.length >= this.config.maxPosts) break;
@@ -126,9 +133,12 @@ class LinkedInBot {
         if (postData && !this.processedPosts.has(postData.id)) {
           posts.push(postData);
           this.processedPosts.add(postData.id);
+          this.log(`Successfully extracted post by ${postData.author}: "${postData.content.substring(0, 50)}..."`);
         }
       } catch (error) {
         this.log(`Error extracting post data: ${error.message}`, 'error');
+        // Log more details for debugging
+        this.log(`Post element classes: ${postElement.className}`, 'info');
       }
     }
     
@@ -136,13 +146,38 @@ class LinkedInBot {
   }
 
   extractPostData(postElement) {
-    // Find the post content
-    const contentElement = postElement.querySelector('.feed-shared-text__text-view span[dir="ltr"]') ||
-                          postElement.querySelector('.feed-shared-text span[dir="ltr"]') ||
-                          postElement.querySelector('.feed-shared-update-v2__description span');
+    // Debug: Log post element structure
+    this.log(`Analyzing post element with classes: ${postElement.className}`);
+    
+    // Find the post content using multiple selectors for LinkedIn's dynamic structure
+    const contentElement = postElement.querySelector('.feed-shared-text__text-view .break-words') ||
+                          postElement.querySelector('.feed-shared-text .break-words') ||
+                          postElement.querySelector('.feed-shared-update-v2__description .break-words') ||
+                          postElement.querySelector('.feed-shared-text__text-view span') ||
+                          postElement.querySelector('.feed-shared-text span') ||
+                          postElement.querySelector('.update-components-text span') ||
+                          postElement.querySelector('[data-test-id="main-feed-activity-card"] .break-words') ||
+                          postElement.querySelector('.feed-shared-update-v2__description span') ||
+                          postElement.querySelector('.feed-shared-text__text-view') ||
+                          postElement.querySelector('.feed-shared-text') ||
+                          postElement.querySelector('.update-components-text');
     
     if (!contentElement) {
-      throw new Error('Could not find post content');
+      // Debug: Show what elements we can find
+      const textElements = postElement.querySelectorAll('*');
+      const textElementsWithContent = Array.from(textElements).filter(el => 
+        el.textContent && el.textContent.trim().length > 20 && 
+        !el.querySelector('*') // Only leaf nodes
+      );
+      
+      this.log(`Found ${textElementsWithContent.length} potential text elements`);
+      
+      if (textElementsWithContent.length > 0) {
+        // Use the first substantial text element
+        return this.createPostDataFromFallback(postElement, textElementsWithContent[0]);
+      }
+      
+      throw new Error('Could not find post content - no text elements found');
     }
 
     // Get post ID (using data attributes or generating one)
@@ -156,9 +191,7 @@ class LinkedInBot {
     }
 
     // Check if we can comment (look for comment button)
-    const commentButton = postElement.querySelector('[aria-label*="omment"]') ||
-                         postElement.querySelector('button[data-control-name*="comment"]') ||
-                         postElement.querySelector('.social-actions-button:nth-child(2)');
+    const commentButton = this.findCommentButton(postElement);
 
     if (!commentButton || commentButton.disabled) {
       throw new Error('Cannot comment on this post');
@@ -166,7 +199,9 @@ class LinkedInBot {
 
     // Extract author info
     const authorElement = postElement.querySelector('.feed-shared-actor__title a') ||
-                         postElement.querySelector('.update-components-actor__title a');
+                         postElement.querySelector('.update-components-actor__title a') ||
+                         postElement.querySelector('.feed-shared-actor__name a') ||
+                         postElement.querySelector('.update-components-actor__name a');
     
     const authorName = authorElement ? authorElement.textContent.trim() : 'Unknown';
 
@@ -177,6 +212,51 @@ class LinkedInBot {
       element: postElement,
       commentButton: commentButton
     };
+  }
+
+  createPostDataFromFallback(postElement, contentElement) {
+    // Get post ID
+    let postId = postElement.getAttribute('data-urn') || 
+                 postElement.getAttribute('data-id') ||
+                 postElement.querySelector('[data-urn]')?.getAttribute('data-urn');
+    
+    if (!postId) {
+      postId = this.generatePostId(contentElement.textContent, postElement);
+    }
+
+    // Find comment button
+    const commentButton = this.findCommentButton(postElement);
+    if (!commentButton || commentButton.disabled) {
+      throw new Error('Cannot comment on this post');
+    }
+
+    // Extract author info
+    const authorElement = postElement.querySelector('.feed-shared-actor__title a') ||
+                         postElement.querySelector('.update-components-actor__title a') ||
+                         postElement.querySelector('.feed-shared-actor__name a') ||
+                         postElement.querySelector('.update-components-actor__name a');
+    
+    const authorName = authorElement ? authorElement.textContent.trim() : 'Unknown';
+
+    return {
+      id: postId,
+      content: contentElement.textContent.trim(),
+      author: authorName,
+      element: postElement,
+      commentButton: commentButton
+    };
+  }
+
+  findCommentButton(postElement) {
+    // Try multiple selectors for comment buttons
+    return postElement.querySelector('[aria-label*="Comment"]') ||
+           postElement.querySelector('[aria-label*="comment"]') ||
+           postElement.querySelector('button[data-control-name*="comment"]') ||
+           postElement.querySelector('.social-actions-button[aria-label*="Comment"]') ||
+           postElement.querySelector('.feed-shared-social-action-bar button[aria-label*="Comment"]') ||
+           postElement.querySelector('.social-counts-reactions__comment-button') ||
+           postElement.querySelector('.feed-shared-social-action-bar .artdeco-button:nth-child(2)') ||
+           postElement.querySelector('.social-actions-button:nth-child(2)');
   }
 
   generatePostId(content, element) {
@@ -240,7 +320,7 @@ class LinkedInBot {
 
       // Wait for comment editor to appear
       const commentEditor = await this.waitForElement(
-        '.comments-comment-texteditor .ql-editor',
+        '.comments-comment-texteditor .ql-editor, .comments-comment-texteditor div[contenteditable="true"], .comments-comment-box__form div[contenteditable="true"], .ql-editor[contenteditable="true"]',
         3000,
         postData.element
       );
@@ -262,7 +342,7 @@ class LinkedInBot {
 
       // Find and click submit button
       const submitButton = await this.waitForElement(
-        '.comments-comment-texteditor .comments-comment-texteditor__submit-button:not([disabled])',
+        '.comments-comment-texteditor .comments-comment-texteditor__submit-button:not([disabled]), .comments-comment-box__submit-button:not([disabled]), .comments-comment-texteditor button[type="submit"]:not([disabled]), .artdeco-button--primary:not([disabled])',
         2000,
         postData.element
       );
@@ -307,26 +387,38 @@ class LinkedInBot {
   }
 
   async typeText(element, text) {
-    // Simulate realistic typing
-    for (let i = 0; i < text.length; i++) {
-      if (!this.isRunning) break;
+    // Clear existing content first
+    element.focus();
+    
+    // Use different methods based on editor type
+    if (element.getAttribute('contenteditable') === 'true') {
+      // For contenteditable elements (LinkedIn's rich text editor)
+      element.innerHTML = '';
       
-      const char = text[i];
+      // Insert text and trigger events
+      element.textContent = text;
       
-      // Insert character at current cursor position
-      element.textContent += char;
+      // Trigger input events that LinkedIn expects
+      element.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+      element.dispatchEvent(new Event('keyup', { bubbles: true, cancelable: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
       
-      // Trigger input events
+      // Trigger composition events for better compatibility
+      element.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      element.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: text }));
+      
+    } else {
+      // For regular input elements
+      element.value = text;
       element.dispatchEvent(new Event('input', { bubbles: true }));
-      element.dispatchEvent(new Event('keyup', { bubbles: true }));
-      
-      // Random typing delay
-      await this.delay(Math.random() * 50 + 30);
+      element.dispatchEvent(new Event('change', { bubbles: true }));
     }
     
-    // Final events
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-    element.dispatchEvent(new Event('blur', { bubbles: true }));
+    // Final focus and blur to ensure state is correct
+    await this.delay(100);
+    element.blur();
+    await this.delay(100);
+    element.focus();
   }
 
   async waitForElement(selector, timeout = 5000, parent = document) {
