@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn Bot Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            background: #0077b5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #005582; }
+        #logs {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 LinkedIn AI Bot Debug Tool</h1>
+    
+    <div class="section">
+        <h2>Extension Status</h2>
+        <div id="status" class="status info">Checking extension status...</div>
+        <button onclick="checkExtension()">Refresh Status</button>
+    </div>
+
+    <div class="section">
+        <h2>Quick Actions</h2>
+        <button onclick="testApiKey()">Test API Key</button>
+        <button onclick="clearStorage()">Clear Settings</button>
+        <button onclick="reloadExtension()">Reload Extension</button>
+    </div>
+
+    <div class="section">
+        <h2>Debug Logs</h2>
+        <pre id="logs">Extension debug tool loaded...</pre>
+        <button onclick="clearLogs()">Clear Logs</button>
+    </div>
+
+    <script>
+        function log(message) {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.textContent += `\n[${timestamp}] ${message}`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        async function checkExtension() {
+            const statusEl = document.getElementById('status');
+            try {
+                // Check if extension APIs are available
+                if (!chrome || !chrome.runtime) {
+                    statusEl.className = 'status error';
+                    statusEl.textContent = 'Chrome extension APIs not available';
+                    return;
+                }
+
+                // Check extension ID
+                const extensionId = chrome.runtime.id;
+                log(`Extension ID: ${extensionId}`);
+
+                // Check storage
+                const storage = await chrome.storage.sync.get(['linkedin_bot_api_key']);
+                const hasApiKey = !!storage.linkedin_bot_api_key;
+                log(`API Key stored: ${hasApiKey ? 'Yes' : 'No'}`);
+
+                // Check current tab
+                try {
+                    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+                    const isLinkedIn = tabs[0]?.url?.includes('linkedin.com');
+                    log(`Current tab: ${tabs[0]?.url || 'Unknown'}`);
+                    log(`On LinkedIn: ${isLinkedIn ? 'Yes' : 'No'}`);
+                    
+                    statusEl.className = 'status success';
+                    statusEl.textContent = `Extension working! API Key: ${hasApiKey ? '✓' : '✗'}, LinkedIn: ${isLinkedIn ? '✓' : '✗'}`;
+                } catch (tabError) {
+                    log(`Tab access error: ${tabError.message}`);
+                    statusEl.className = 'status error';
+                    statusEl.textContent = 'Cannot access current tab - check permissions';
+                }
+
+            } catch (error) {
+                log(`Extension check error: ${error.message}`);
+                statusEl.className = 'status error';
+                statusEl.textContent = `Extension error: ${error.message}`;
+            }
+        }
+
+        async function testApiKey() {
+            try {
+                const storage = await chrome.storage.sync.get(['linkedin_bot_api_key']);
+                if (!storage.linkedin_bot_api_key) {
+                    log('No API key found in storage');
+                    return;
+                }
+
+                log('Testing OpenAI API connection...');
+                const response = await fetch('https://api.openai.com/v1/models', {
+                    headers: {
+                        'Authorization': `Bearer ${storage.linkedin_bot_api_key}`
+                    }
+                });
+
+                if (response.ok) {
+                    log('API key is valid ✓');
+                } else {
+                    log(`API key test failed: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                log(`API test error: ${error.message}`);
+            }
+        }
+
+        async function clearStorage() {
+            try {
+                await chrome.storage.sync.clear();
+                log('All extension settings cleared');
+            } catch (error) {
+                log(`Clear storage error: ${error.message}`);
+            }
+        }
+
+        function reloadExtension() {
+            log('Extension reload requested');
+            chrome.runtime.reload();
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').textContent = 'Logs cleared...';
+        }
+
+        // Auto-check on load
+        checkExtension();
+    </script>
+</body>
+</html>

@@ -27,16 +27,31 @@ class LinkedInBot {
 
   setupMessageListener() {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      switch (message.type) {
-        case 'START_BOT':
-          this.startBot(message.config);
-          sendResponse({ success: true });
-          break;
-        case 'STOP_BOT':
-          this.stopBot();
-          sendResponse({ success: true });
-          break;
+      console.log('[LinkedIn Bot] Received message:', message.type);
+      
+      try {
+        switch (message.type) {
+          case 'START_BOT':
+            this.startBot(message.config);
+            sendResponse({ success: true, message: 'Bot started successfully' });
+            break;
+          case 'STOP_BOT':
+            this.stopBot();
+            sendResponse({ success: true, message: 'Bot stopped successfully' });
+            break;
+          case 'PING':
+            // Health check message
+            sendResponse({ success: true, message: 'Content script is active' });
+            break;
+          default:
+            sendResponse({ success: false, message: `Unknown message type: ${message.type}` });
+        }
+      } catch (error) {
+        console.error('[LinkedIn Bot] Message handler error:', error);
+        sendResponse({ success: false, message: error.message });
       }
+      
+      return true; // Keep message channel open for async operations
     });
   }
 

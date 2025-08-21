@@ -189,6 +189,27 @@ class PopupController {
         return;
       }
 
+      // Ensure content script is injected and ready
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['config.js', 'content.js']
+        });
+        
+        // Small delay to ensure script initialization
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (scriptError) {
+        // Content script might already be loaded, continue
+        console.log('Content script injection result:', scriptError.message);
+      }
+
+      // Test connection with ping
+      try {
+        await chrome.tabs.sendMessage(tab.id, { type: 'PING' });
+      } catch (pingError) {
+        throw new Error('Content script not responding. Please refresh the LinkedIn page and try again.');
+      }
+
       // Send start message to content script
       await chrome.tabs.sendMessage(tab.id, {
         type: 'START_BOT',
@@ -219,7 +240,12 @@ class PopupController {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
-      await chrome.tabs.sendMessage(tab.id, { type: 'STOP_BOT' });
+      try {
+        await chrome.tabs.sendMessage(tab.id, { type: 'STOP_BOT' });
+      } catch (messageError) {
+        // Content script might not be responsive, that's ok
+        console.log('Stop message result:', messageError.message);
+      }
       
       this.handleBotStopped();
       this.addLog('Bot stopped', 'success');
