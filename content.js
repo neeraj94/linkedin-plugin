@@ -192,11 +192,14 @@ class LinkedInBot {
     // Debug: Log post element structure
     this.log(`Analyzing post element with classes: ${postElement.className}`);
     
-    // Check if this is an ad or sponsored content
-    const isAd = this.isAdvertisement(postElement);
-    if (isAd) {
-      throw new Error('Skipping advertisement/sponsored post');
-    }
+    // Temporarily disable ad detection for debugging - check if posts can be extracted
+    // const isAd = this.isAdvertisement(postElement);
+    // if (isAd) {
+    //   this.log(`Detected sponsored content, skipping post`, 'info');
+    //   throw new Error('Skipping advertisement/sponsored post');
+    // }
+    
+    this.log(`Processing regular post for content extraction`, 'info');
     
     // Check if already engaged with this post
     const alreadyEngaged = this.isAlreadyEngaged(postElement);
@@ -219,16 +222,23 @@ class LinkedInBot {
     
     if (!contentElement) {
       // Debug: Show what elements we can find
+      this.log(`No content element found with standard selectors`);
+      
       const textElements = postElement.querySelectorAll('*');
       const textElementsWithContent = Array.from(textElements).filter(el => 
         el.textContent && el.textContent.trim().length > 20 && 
         !el.querySelector('*') // Only leaf nodes
       );
       
-      this.log(`Found ${textElementsWithContent.length} potential text elements`);
+      this.log(`Found ${textElementsWithContent.length} potential text elements in fallback`);
+      
+      // Log first few text elements for debugging
+      textElementsWithContent.slice(0, 3).forEach((el, i) => {
+        this.log(`Text element ${i + 1}: "${el.textContent.trim().substring(0, 50)}..."`);
+      });
       
       if (textElementsWithContent.length > 0) {
-        // Use the first substantial text element
+        this.log(`Using fallback method with first text element`);
         return this.createPostDataFromFallback(postElement, textElementsWithContent[0]);
       }
       
@@ -247,8 +257,10 @@ class LinkedInBot {
 
     // Check if we can comment (look for comment button)
     const commentButton = this.findCommentButton(postElement);
+    this.log(`Comment button found: ${!!commentButton}`);
 
     if (!commentButton || commentButton.disabled) {
+      this.log(`Cannot comment - button missing or disabled`);
       throw new Error('Cannot comment on this post');
     }
 
@@ -313,30 +325,32 @@ class LinkedInBot {
   }
 
   isAdvertisement(postElement) {
-    // Check for sponsored content indicators
-    const adIndicators = [
-      'Sponsored',
-      'Promoted',
-      'Ad',
-      'Advertisement',
-      'sponsored',
-      'promoted'
-    ];
+    // More specific checks for actual sponsored content
     
-    // Check post text for ad indicators
-    const postText = postElement.textContent.toLowerCase();
-    const hasAdKeywords = adIndicators.some(indicator => 
-      postText.includes(indicator.toLowerCase())
-    );
+    // Check for specific promoted post indicators in the actor section
+    const actorElement = postElement.querySelector('.feed-shared-actor') || 
+                        postElement.querySelector('.update-components-actor');
     
-    // Check for promoted post classes or attributes
-    const hasAdClasses = postElement.querySelector('[aria-label*="Promoted"]') ||
-                        postElement.querySelector('[aria-label*="Sponsored"]') ||
-                        postElement.querySelector('.feed-shared-actor__sub-description') ||
-                        postElement.classList.contains('promoted') ||
-                        postElement.querySelector('.feed-shared-actor__description')?.textContent?.includes('Promoted');
+    if (actorElement) {
+      const actorText = actorElement.textContent;
+      
+      // Look for "Promoted" text specifically in actor description
+      if (actorText.includes('Promoted') || actorText.includes('Sponsored')) {
+        return true;
+      }
+    }
     
-    return hasAdKeywords || hasAdClasses;
+    // Check for promoted post specific classes
+    const hasPromotedClasses = postElement.querySelector('[data-promoted-post="true"]') ||
+                              postElement.querySelector('.feed-shared-actor__sub-description:contains("Promoted")') ||
+                              postElement.classList.contains('feed-shared-update-v2--promoted');
+    
+    // Check for sponsored content labels
+    const sponsoredLabels = postElement.querySelector('[aria-label*="Sponsored"]') ||
+                           postElement.querySelector('[aria-label*="Promoted"]');
+    
+    // Only flag as ad if we find specific promoted/sponsored indicators
+    return hasPromotedClasses || sponsoredLabels;
   }
 
   isAlreadyEngaged(postElement) {
