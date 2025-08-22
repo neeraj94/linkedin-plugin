@@ -192,6 +192,18 @@ class LinkedInBot {
     // Debug: Log post element structure
     this.log(`Analyzing post element with classes: ${postElement.className}`);
     
+    // Check if this is an ad or sponsored content
+    const isAd = this.isAdvertisement(postElement);
+    if (isAd) {
+      throw new Error('Skipping advertisement/sponsored post');
+    }
+    
+    // Check if already engaged with this post
+    const alreadyEngaged = this.isAlreadyEngaged(postElement);
+    if (alreadyEngaged.liked && alreadyEngaged.commented) {
+      throw new Error('Already liked and commented on this post');
+    }
+    
     // Find the post content using multiple selectors for LinkedIn's dynamic structure
     const contentElement = postElement.querySelector('.feed-shared-text__text-view .break-words') ||
                           postElement.querySelector('.feed-shared-text .break-words') ||
@@ -248,12 +260,17 @@ class LinkedInBot {
     
     const authorName = authorElement ? authorElement.textContent.trim() : 'Unknown';
 
+    // Get engagement status
+    const engagementStatus = this.isAlreadyEngaged(postElement);
+
     return {
       id: postId,
       content: contentElement.textContent.trim(),
       author: authorName,
       element: postElement,
-      commentButton: commentButton
+      commentButton: commentButton,
+      alreadyLiked: engagementStatus.liked,
+      alreadyCommented: engagementStatus.commented
     };
   }
 
@@ -281,12 +298,72 @@ class LinkedInBot {
     
     const authorName = authorElement ? authorElement.textContent.trim() : 'Unknown';
 
+    // Get engagement status
+    const engagementStatus = this.isAlreadyEngaged(postElement);
+
     return {
       id: postId,
       content: contentElement.textContent.trim(),
       author: authorName,
       element: postElement,
-      commentButton: commentButton
+      commentButton: commentButton,
+      alreadyLiked: engagementStatus.liked,
+      alreadyCommented: engagementStatus.commented
+    };
+  }
+
+  isAdvertisement(postElement) {
+    // Check for sponsored content indicators
+    const adIndicators = [
+      'Sponsored',
+      'Promoted',
+      'Ad',
+      'Advertisement',
+      'sponsored',
+      'promoted'
+    ];
+    
+    // Check post text for ad indicators
+    const postText = postElement.textContent.toLowerCase();
+    const hasAdKeywords = adIndicators.some(indicator => 
+      postText.includes(indicator.toLowerCase())
+    );
+    
+    // Check for promoted post classes or attributes
+    const hasAdClasses = postElement.querySelector('[aria-label*="Promoted"]') ||
+                        postElement.querySelector('[aria-label*="Sponsored"]') ||
+                        postElement.querySelector('.feed-shared-actor__sub-description') ||
+                        postElement.classList.contains('promoted') ||
+                        postElement.querySelector('.feed-shared-actor__description')?.textContent?.includes('Promoted');
+    
+    return hasAdKeywords || hasAdClasses;
+  }
+
+  isAlreadyEngaged(postElement) {
+    // Check if already liked (liked button will have active/pressed state)
+    const likeButton = postElement.querySelector('[data-control-name="like"]') ||
+                      postElement.querySelector('button[aria-label*="like"]') ||
+                      postElement.querySelector('.react-button__trigger');
+    
+    const alreadyLiked = likeButton && (
+      likeButton.classList.contains('react-button__trigger--active') ||
+      likeButton.classList.contains('reactions-react-button--active') ||
+      likeButton.getAttribute('aria-pressed') === 'true' ||
+      likeButton.querySelector('.reaction-button--active')
+    );
+    
+    // Check if already commented (look for our previous comments)
+    const commentSection = postElement.querySelector('.comments-comment-box') ||
+                          postElement.querySelector('.social-details-social-counts');
+    
+    // Simple check - if we can see expanded comments, we might have commented
+    const alreadyCommented = commentSection && 
+      (commentSection.querySelector('.comments-comment-item') || 
+       commentSection.textContent.includes('comment'));
+    
+    return {
+      liked: !!alreadyLiked,
+      commented: !!alreadyCommented
     };
   }
 
@@ -384,7 +461,7 @@ class LinkedInBot {
       if (!this.isRunning) break;
 
       try {
-        if (action === 'like') {
+        if (action === 'like' && !postData.alreadyLiked) {
           await this.likePost(postData);
           result.liked = true;
           this.updateStats({ postsLiked: this.stats.postsLiked + 1 });
@@ -394,16 +471,20 @@ class LinkedInBot {
           if (shuffledActions.length > 1) {
             await this.delay(this.getRandomDelay(0.5, 2) * 1000);
           }
+        } else if (action === 'like' && postData.alreadyLiked) {
+          this.log(`⏭️ Already liked post by ${postData.author}`, 'info');
         }
 
-        if (action === 'comment') {
-          const comment = await this.generateComment(postData.content);
+        if (action === 'comment' && !postData.alreadyCommented) {
+          const commentResult = await this.generateComment(postData.content);
           
-          if (comment) {
-            await this.postComment(postData, comment);
+          if (commentResult && commentResult.skip) {
+            this.log(`⏭️ Skipped post by ${postData.author}: ${commentResult.reason}`, 'info');
+          } else if (commentResult && commentResult.comment) {
+            await this.postComment(postData, commentResult.comment);
             result.commented = true;
             this.updateStats({ commentsPosted: this.stats.commentsPosted + 1 });
-            this.log(`✓ Commented on post by ${postData.author}: "${comment.substring(0, 30)}..."`, 'success');
+            this.log(`✓ Commented on post by ${postData.author}: "${commentResult.comment.substring(0, 30)}..."`, 'success');
           } else {
             this.log(`Failed to generate comment for post by ${postData.author}`, 'error');
           }
@@ -430,7 +511,7 @@ class LinkedInBot {
         }
 
         if (response.success) {
-          resolve(response.comment);
+          resolve(response.result);
         } else {
           reject(new Error(response.error || 'Failed to generate comment'));
         }

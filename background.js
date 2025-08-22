@@ -29,11 +29,11 @@ class BackgroundService {
         throw new Error('Invalid OpenAI API key');
       }
 
-      const comment = await this.generateComment(postContent, commentStyle, openaiKey);
+      const result = await this.generateComment(postContent, commentStyle, openaiKey);
       
       sendResponse({
         success: true,
-        comment: comment
+        result: result
       });
       
     } catch (error) {
@@ -86,11 +86,16 @@ class BackgroundService {
     try {
       const result = JSON.parse(data.choices[0].message.content);
       
+      // Handle skip directive for ads/sponsored content
+      if (result.skip) {
+        return { skip: true, reason: result.reason || 'AI decided to skip this post' };
+      }
+      
       if (!result.comment || typeof result.comment !== 'string') {
         throw new Error('Invalid comment format in API response');
       }
 
-      return result.comment.trim();
+      return { comment: result.comment.trim(), skip: false };
       
     } catch (parseError) {
       throw new Error('Failed to parse OpenAI response: ' + parseError.message);
@@ -98,29 +103,42 @@ class BackgroundService {
   }
 
   getSystemPrompt(commentStyle) {
-    const basePrompt = `You are a LinkedIn engagement expert. Generate authentic, meaningful comments that add value to professional discussions. `;
+    if (commentStyle === 'adaptive') {
+      return `You are a LinkedIn engagement expert. Analyze the post content and generate the most appropriate response based on context:
+
+POST TYPE RESPONSES:
+- Job announcements/new positions: Brief congratulations (1-2 lines) like "Congratulations! 🎉", "Exciting opportunity!", "Best of luck in your new role!"
+- Achievement/milestone posts: Enthusiastic support like "Amazing work! 👏", "Well deserved!", "So inspiring!", "Wow, incredible!"
+- Industry insights/articles: Thoughtful responses with questions like "Great points! Have you considered...?", "Love this perspective...", "This aligns with..."
+- Personal stories: Warm, relatable responses like "Love this!", "So true!", "Thanks for sharing!", "Haha, been there too!"
+- Business updates/company news: Professional but engaging responses
+
+RULES:
+- Maximum 4 lines, often 1-2 lines is perfect
+- Use natural expressions: "haha", "wow", "love this", "so true", "amazing" when appropriate
+- Add professional emojis sparingly: 🎉 👏 💡 🚀 ❤️
+- Vary length - not every comment needs to be long
+- Be authentic and conversational
+- Skip obvious advertisements or sponsored content
+
+If post appears to be an ad/sponsored content, return: {"skip": true, "reason": "advertisement"}
+Otherwise return: {"comment": "your engaging comment"}`;
+    }
+    
+    const basePrompt = `You are a LinkedIn engagement expert. Generate authentic, meaningful comments (max 4 lines). `;
     
     const stylePrompts = {
-      professional: `Write in a professional, business-focused tone. Use industry terminology appropriately and maintain formal language. Focus on business insights and professional perspectives.`,
-      
-      casual: `Write in a friendly, conversational tone while remaining professional. Use a more relaxed approach but keep it appropriate for LinkedIn. Be approachable and personable.`,
-      
-      insightful: `Provide thoughtful analysis and deeper perspectives. Ask meaningful questions or share relevant insights that encourage further discussion. Be intellectually engaging.`,
-      
-      supportive: `Be encouraging and supportive. Acknowledge achievements, offer congratulations, or provide positive reinforcement. Focus on building others up and showing appreciation.`
+      professional: `Professional tone with business insights. Use industry terminology and formal language.`,
+      casual: `Friendly, conversational tone while remaining professional. Be approachable and personable.`,
+      insightful: `Thoughtful analysis with meaningful questions. Be intellectually engaging and encourage discussion.`,
+      supportive: `Encouraging and supportive. Acknowledge achievements and build others up with positive reinforcement.`
     };
 
     const guidelines = `
-
-Guidelines:
-- Keep comments between 20-80 words
-- Be genuine and avoid generic responses
-- Add value to the conversation
-- Use proper grammar and punctuation
-- Avoid controversial topics
-- Don't use excessive emojis or hashtags
-- Make it personal but professional
-- Encourage engagement from others`;
+- Keep authentic and engaging (20-80 words)
+- Add value to the conversation  
+- Use proper grammar and appropriate emojis occasionally
+- Avoid generic responses and controversial topics`;
 
     return basePrompt + (stylePrompts[commentStyle] || stylePrompts.professional) + guidelines;
   }

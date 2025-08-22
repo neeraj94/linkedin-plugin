@@ -4,16 +4,23 @@
 
 This is a Chrome browser extension that automates LinkedIn engagement through AI-generated comments. The bot scans LinkedIn feeds, extracts post content, generates contextually appropriate comments using OpenAI's GPT-4o model, and automatically posts them to increase user engagement on the platform. The extension uses a human-like interaction pattern with configurable delays and comment styles to avoid detection as an automated tool.
 
-## Recent Changes (August 21, 2025)
+## Recent Changes (August 22, 2025)
 
-### Major Feature Update - Enhanced Engagement Capabilities
+### AI-Powered Smart Engagement System
+- **Smart Adaptive Comments**: AI automatically chooses response style based on post content (job announcements, achievements, insights, personal stories)
+- **Natural Expressions**: Added "haha", "wow", "love this", "so true" and professional emojis for authentic engagement
+- **Variable Comment Length**: Comments range from 1-4 lines, with many being short and natural (not every comment is long)
+- **Advertisement Detection**: Automatically skips sponsored posts and ads to avoid spam-like behavior
+- **Engagement Checking**: Detects already liked/commented posts and skips them to prevent duplicate actions
+- **Context-Aware Responses**: Job posts get congratulations, achievements get praise, insights get thoughtful questions
+
+### Advanced Feature Update (August 21, 2025)
 - **Post Liking Feature**: Added automatic post liking with smart detection of already-liked posts
-- **Flexible Action Controls**: Users can now enable/disable likes and comments independently
+- **Flexible Action Controls**: Users can now enable/disable likes and comments independently  
 - **Advanced Limits System**: Separate controls for max posts to like (1-100) and comment (1-50)
 - **Human-like Behavior**: Implemented randomized delays between actions (user-configurable range)
 - **Action Randomization**: Bot randomly shuffles like/comment order to appear more natural
 - **Enhanced Statistics**: Added real-time tracking for posts liked in addition to comments posted
-- **Improved UI**: New checkbox controls, delay settings, and comprehensive configuration options
 
 ### Technical Improvements (August 20, 2025)
 - Fixed browser compatibility issues (removed Node.js process.env usage)
