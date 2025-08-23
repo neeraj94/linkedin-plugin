@@ -162,29 +162,58 @@ class LinkedInBot {
     }
     
     const posts = [];
-    // Try multiple selectors for feed posts
-    const postElements = document.querySelectorAll('.feed-shared-update-v2, [data-test-id="main-feed-activity-card"], .feed-shared-update-v2__container');
+    let scrollAttempts = 0;
+    const maxScrollAttempts = 3; // Limit scrolling attempts
     
-    this.log(`Found ${postElements.length} potential post elements`);
+    // Initial scan for posts
+    let postElements = document.querySelectorAll('.feed-shared-update-v2, [data-test-id="main-feed-activity-card"], .feed-shared-update-v2__container');
+    this.log(`Found ${postElements.length} potential post elements initially`);
     
-    for (const postElement of postElements) {
-      if (posts.length >= this.config.maxPosts) break;
-      
-      try {
-        const postData = this.extractPostData(postElement);
+    // If we need more posts and haven't found enough, try scrolling to load more
+    while (posts.length < this.config.maxPosts && scrollAttempts < maxScrollAttempts) {
+      // Extract posts from currently visible elements
+      for (const postElement of postElements) {
+        if (posts.length >= this.config.maxPosts) break;
         
-        if (postData && !this.processedPosts.has(postData.id)) {
-          posts.push(postData);
-          this.processedPosts.add(postData.id);
-          this.log(`Successfully extracted post by ${postData.author}: "${postData.content.substring(0, 50)}..."`);
+        try {
+          const postData = this.extractPostData(postElement);
+          
+          if (postData && !this.processedPosts.has(postData.id)) {
+            posts.push(postData);
+            this.processedPosts.add(postData.id);
+            this.log(`Successfully extracted post by ${postData.author}: "${postData.content.substring(0, 50)}..."`);
+          }
+        } catch (error) {
+          this.log(`Error extracting post data: ${error.message}`, 'error');
+          // Log more details for debugging
+          this.log(`Post element classes: ${postElement.className}`, 'info');
         }
-      } catch (error) {
-        this.log(`Error extracting post data: ${error.message}`, 'error');
-        // Log more details for debugging
-        this.log(`Post element classes: ${postElement.className}`, 'info');
+      }
+      
+      // If we still need more posts, try scrolling to load more
+      if (posts.length < this.config.maxPosts && scrollAttempts < maxScrollAttempts) {
+        scrollAttempts++;
+        this.log(`Scrolling to load more posts (attempt ${scrollAttempts}/${maxScrollAttempts})...`);
+        
+        // Scroll down to trigger more posts to load
+        const currentPostCount = postElements.length;
+        window.scrollTo(0, window.scrollY + 800); // Scroll down
+        await this.delay(2000); // Wait for posts to load
+        
+        // Check for new posts
+        postElements = document.querySelectorAll('.feed-shared-update-v2, [data-test-id="main-feed-activity-card"], .feed-shared-update-v2__container');
+        
+        if (postElements.length === currentPostCount) {
+          // No new posts loaded, stop scrolling
+          this.log('No new posts loaded after scrolling, stopping scroll attempts');
+          break;
+        } else {
+          this.log(`After scrolling: found ${postElements.length} total potential post elements`);
+        }
       }
     }
     
+    this.log(`Final result: Found ${posts.length} processable posts out of ${postElements.length} total elements`);
     return posts;
   }
 
