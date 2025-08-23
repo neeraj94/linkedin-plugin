@@ -490,17 +490,20 @@ class LinkedInBot {
         }
 
         if (action === 'comment' && !postData.alreadyCommented) {
+          this.log(`Generating ${this.config.commentStyle} comment for post by ${postData.author}...`, 'info');
           const commentResult = await this.generateComment(postData.content);
           
           if (commentResult && commentResult.skip) {
             this.log(`⏭️ Skipped post by ${postData.author}: ${commentResult.reason}`, 'info');
           } else if (commentResult && commentResult.comment) {
+            this.log(`Generated comment: "${commentResult.comment}"`, 'info');
             await this.postComment(postData, commentResult.comment);
             result.commented = true;
             this.updateStats({ commentsPosted: this.stats.commentsPosted + 1 });
-            this.log(`✓ Commented on post by ${postData.author}: "${commentResult.comment.substring(0, 30)}..."`, 'success');
+            this.log(`✓ Commented on post by ${postData.author}: "${commentResult.comment}"`, 'success');
           } else {
-            this.log(`Failed to generate comment for post by ${postData.author}`, 'error');
+            this.log(`Failed to generate comment for post by ${postData.author} - no comment returned`, 'error');
+            this.updateStats({ errors: this.stats.errors + 1 });
           }
         }
       } catch (error) {

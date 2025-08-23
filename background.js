@@ -63,7 +63,7 @@ class BackgroundService {
           },
           {
             role: 'user',
-            content: `Please generate a ${commentStyle} LinkedIn comment for this post:\n\n${postContent}\n\nRespond with JSON in this format: { "comment": "your comment here" }`
+            content: this.getUserPrompt(commentStyle, postContent)
           }
         ],
         response_format: { type: 'json_object' },
@@ -167,6 +167,23 @@ Otherwise return: {"comment": "your_word_here"} or {"comment": "your_word_here ï
 - Avoid generic responses and controversial topics`;
 
     return basePrompt + (stylePrompts[commentStyle] || stylePrompts.professional) + guidelines;
+  }
+
+  getUserPrompt(commentStyle, postContent) {
+    if (commentStyle === 'oneword') {
+      return `Analyze this LinkedIn post and respond with exactly ONE WORD (+ optional emoji) that captures the appropriate emotional response:\n\n${postContent}\n\nRespond with JSON in this format: { "comment": "your_one_word_here" } or { "comment": "your_word ðŸ”¥" }`;
+    }
+
+    const styleDescriptions = {
+      'adaptive': 'smart adaptive',
+      'professional': 'professional',
+      'casual': 'friendly and casual',
+      'insightful': 'insightful and thoughtful',
+      'supportive': 'supportive and encouraging'
+    };
+
+    const styleDesc = styleDescriptions[commentStyle] || 'professional';
+    return `Please generate a ${styleDesc} LinkedIn comment for this post:\n\n${postContent}\n\nRespond with JSON in this format: { "comment": "your comment here" }`;
   }
 }
 
