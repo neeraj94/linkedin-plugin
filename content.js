@@ -366,18 +366,16 @@ class LinkedInBot {
       likeButton.querySelector('.reaction-button--active')
     );
     
-    // Check if already commented (look for our previous comments)
-    const commentSection = postElement.querySelector('.comments-comment-box') ||
-                          postElement.querySelector('.social-details-social-counts');
+    // More specific check for already commented - look for actual comment items, not just the comment section
+    const commentItems = postElement.querySelectorAll('.comments-comment-item, .comments-comment-item__main-content');
     
-    // Simple check - if we can see expanded comments, we might have commented
-    const alreadyCommented = commentSection && 
-      (commentSection.querySelector('.comments-comment-item') || 
-       commentSection.textContent.includes('comment'));
+    // Only consider it as already commented if there are actual comment items visible
+    // (not just the comment input box or "Add comment" text)
+    const alreadyCommented = commentItems.length > 0;
     
     return {
       liked: !!alreadyLiked,
-      commented: !!alreadyCommented
+      commented: alreadyCommented
     };
   }
 
@@ -489,7 +487,12 @@ class LinkedInBot {
           this.log(`⏭️ Already liked post by ${postData.author}`, 'info');
         }
 
+        if (action === 'comment' && postData.alreadyCommented) {
+          this.log(`⏭️ Already commented on post by ${postData.author}`, 'info');
+        }
+
         if (action === 'comment' && !postData.alreadyCommented) {
+          this.log(`✅ Starting comment generation for ${postData.author} (alreadyCommented: ${postData.alreadyCommented})`, 'info');
           this.log(`Generating ${this.config.commentStyle} comment for post by ${postData.author}...`, 'info');
           const commentResult = await this.generateComment(postData.content);
           
