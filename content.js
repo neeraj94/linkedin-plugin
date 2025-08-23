@@ -376,17 +376,26 @@ class LinkedInBot {
       }
     }
     
-    // Check for promoted post specific classes
+    // Check for promoted post specific classes and attributes
     const hasPromotedClasses = postElement.querySelector('[data-promoted-post="true"]') ||
-                              postElement.querySelector('.feed-shared-actor__sub-description:contains("Promoted")') ||
                               postElement.classList.contains('feed-shared-update-v2--promoted');
     
-    // Check for sponsored content labels
+    // Check for sponsored content labels using text content instead of :contains()
+    const subDescriptions = postElement.querySelectorAll('.feed-shared-actor__sub-description');
+    let hasPromotedText = false;
+    for (const desc of subDescriptions) {
+      if (desc.textContent.includes('Promoted') || desc.textContent.includes('Sponsored')) {
+        hasPromotedText = true;
+        break;
+      }
+    }
+    
+    // Check for sponsored content labels in aria-labels
     const sponsoredLabels = postElement.querySelector('[aria-label*="Sponsored"]') ||
                            postElement.querySelector('[aria-label*="Promoted"]');
     
     // Only flag as ad if we find specific promoted/sponsored indicators
-    return hasPromotedClasses || sponsoredLabels;
+    return hasPromotedClasses || hasPromotedText || sponsoredLabels;
   }
 
   isAlreadyEngaged(postElement) {

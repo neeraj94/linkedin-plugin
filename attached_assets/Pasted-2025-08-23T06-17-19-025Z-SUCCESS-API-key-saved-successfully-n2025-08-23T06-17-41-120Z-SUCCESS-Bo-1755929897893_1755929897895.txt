@@ -1,0 +1,55 @@
+2025-08-23T06:17:19.025Z [SUCCESS] API key saved successfully\n2025-08-23T06:17:41.120Z [SUCCESS] Bot started successfully\n2025-08-23T06:17:41.128Z [INFO] Starting LinkedIn engagement bot...\n2025-08-23T06:17:41.129Z [INFO] Found 3 potential post elements initially\n2025-08-23T06:17:41.130Z [INFO] Analyzing post element with classes: feed-shared-update-v2 feed-shared-update-v2--minimal-padding full-height feed-shared-update-v2--with-carousel-fix relative
+            
+            feed-shared-update-v2--e2e
+            
+            
+            
+            artdeco-card
+            
+            
+            \n2025-08-23T06:17:41.130Z [ERROR] Error extracting post data: Failed to execute 'querySelector' on 'Element': '.feed-shared-actor__sub-description:contains("Promoted")' is not a valid selector.\n2025-08-23T06:17:41.131Z [INFO] Post element classes: feed-shared-update-v2 feed-shared-update-v2--minimal-padding full-height feed-shared-update-v2--with-carousel-fix relative
+            
+            feed-shared-update-v2--e2e
+            
+            
+            
+            artdeco-card
+            
+            
+            \n2025-08-23T06:17:41.131Z [INFO] Analyzing post element with classes: feed-shared-update-v2 feed-shared-update-v2--minimal-padding full-height feed-shared-update-v2--with-carousel-fix relative
+            
+            feed-shared-update-v2--e2e
+            
+            
+            
+            artdeco-card
+            
+            
+            \n2025-08-23T06:17:41.131Z [ERROR] Error extracting post data: Failed to execute 'querySelector' on 'Element': '.feed-shared-actor__sub-description:contains("Promoted")' is not a valid selector.\n2025-08-23T06:17:41.131Z [INFO] Post element classes: feed-shared-update-v2 feed-shared-update-v2--minimal-padding full-height feed-shared-update-v2--with-carousel-fix relative
+            
+            feed-shared-update-v2--e2e
+            
+            
+            
+            artdeco-card
+            
+            
+            \n2025-08-23T06:17:41.132Z [INFO] Analyzing post element with classes: feed-shared-update-v2 feed-shared-update-v2--minimal-padding full-height feed-shared-update-v2--with-carousel-fix relative
+            
+            feed-shared-update-v2--e2e
+            
+            
+            
+            artdeco-card
+            
+            
+            \n2025-08-23T06:17:41.132Z [ERROR] Error extracting post data: Failed to execute 'querySelector' on 'Element': '.feed-shared-actor__sub-description:contains("Promoted")' is not a valid selector.\n2025-08-23T06:17:41.132Z [INFO] Post element classes: feed-shared-update-v2 feed-shared-update-v2--minimal-padding full-height feed-shared-update-v2--with-carousel-fix relative
+            
+            feed-shared-update-v2--e2e
+            
+            
+            
+            artdeco-card
+            
+            
+            \n2025-08-23T06:17:41.133Z [INFO] Scrolling to load more posts (attempt 1/3)...\n2025-08-23T06:17:43.661Z [INFO] No new posts loaded after scrolling, stopping scroll attempts\n2025-08-23T06:17:43.664Z [INFO] Final result: Found 0 processable posts out of 3 total elements\n2025-08-23T06:17:43.664Z [ERROR] No posts found in feed\n2025-08-23T06:17:43.665Z [INFO] Bot stopped
