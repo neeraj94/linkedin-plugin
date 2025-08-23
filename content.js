@@ -195,10 +195,17 @@ class LinkedInBot {
         scrollAttempts++;
         this.log(`Scrolling to load more posts (attempt ${scrollAttempts}/${maxScrollAttempts})...`);
         
-        // Scroll down to trigger more posts to load
+        // Scroll down like a human - smooth and varied
         const currentPostCount = postElements.length;
-        window.scrollTo(0, window.scrollY + 800); // Scroll down
-        await this.delay(2000); // Wait for posts to load
+        const scrollAmount = 400 + Math.random() * 600; // Random scroll between 400-1000px
+        window.scrollTo({ 
+          top: window.scrollY + scrollAmount, 
+          behavior: 'smooth' 
+        });
+        
+        // Human-like pause - varied timing
+        const pauseTime = 1500 + Math.random() * 1500; // 1.5-3 seconds
+        await this.delay(pauseTime);
         
         // Check for new posts
         postElements = document.querySelectorAll('.feed-shared-update-v2, [data-test-id="main-feed-activity-card"], .feed-shared-update-v2__container');
@@ -221,12 +228,12 @@ class LinkedInBot {
     // Debug: Log post element structure
     this.log(`Analyzing post element with classes: ${postElement.className}`);
     
-    // Temporarily disable ad detection for debugging - check if posts can be extracted
-    // const isAd = this.isAdvertisement(postElement);
-    // if (isAd) {
-    //   this.log(`Detected sponsored content, skipping post`, 'info');
-    //   throw new Error('Skipping advertisement/sponsored post');
-    // }
+    // Check for sponsored/promoted content and skip
+    const isAd = this.isAdvertisement(postElement);
+    if (isAd) {
+      this.log(`Detected sponsored content, skipping post`, 'info');
+      throw new Error('Skipping advertisement/sponsored post');
+    }
     
     this.log(`Processing regular post for content extraction`, 'info');
     

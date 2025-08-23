@@ -9,11 +9,13 @@ class PopupController {
       commentsPosted: 0,
       errors: 0
     };
+    this.globalLogs = [];
     
     this.initializeElements();
     this.loadStoredData();
     this.setupEventListeners();
     this.setupMessageListener();
+    this.updateModeExplanation();
   }
 
   initializeElements() {
@@ -21,15 +23,16 @@ class PopupController {
       apiKey: document.getElementById('apiKey'),
       saveKey: document.getElementById('saveKey'),
       commentStyle: document.getElementById('commentStyle'),
+      modeExplanation: document.getElementById('modeExplanation'),
       maxPosts: document.getElementById('maxPosts'),
-      enableLikes: document.getElementById('enableLikes'),
-      enableComments: document.getElementById('enableComments'),
       maxLikes: document.getElementById('maxLikes'),
       maxComments: document.getElementById('maxComments'),
+      validationMsg: document.getElementById('validationMsg'),
       delayMin: document.getElementById('delayMin'),
       delayMax: document.getElementById('delayMax'),
       startBot: document.getElementById('startBot'),
       stopBot: document.getElementById('stopBot'),
+      downloadLogs: document.getElementById('downloadLogs'),
       status: document.getElementById('status'),
       postsFound: document.getElementById('postsFound'),
       postsLiked: document.getElementById('postsLiked'),
@@ -45,13 +48,12 @@ class PopupController {
         'openaiApiKey',
         'commentStyle',
         'maxPosts',
-        'enableLikes',
-        'enableComments',
         'maxLikes',
         'maxComments',
         'delayMin',
         'delayMax',
-        'stats'
+        'stats',
+        'globalLogs'
       ]);
 
       if (result.openaiApiKey) {
@@ -66,13 +68,8 @@ class PopupController {
         this.elements.maxPosts.value = result.maxPosts;
       }
 
-      if (result.enableLikes !== undefined) {
-        this.elements.enableLikes.checked = result.enableLikes;
-      }
-
-      if (result.enableComments !== undefined) {
-        this.elements.enableComments.checked = result.enableComments;
-      }
+      // Auto-populate likes and comments based on max posts
+      this.updateCountsFromMaxPosts();
 
       if (result.maxLikes) {
         this.elements.maxLikes.value = result.maxLikes;
@@ -94,6 +91,10 @@ class PopupController {
         this.stats = { ...this.stats, ...result.stats };
         this.updateStatsDisplay();
       }
+
+      if (result.globalLogs) {
+        this.globalLogs = result.globalLogs || [];
+      }
     } catch (error) {
       this.addLog('Error loading stored data: ' + error.message, 'error');
     }
@@ -103,14 +104,25 @@ class PopupController {
     this.elements.saveKey.addEventListener('click', () => this.saveApiKey());
     this.elements.startBot.addEventListener('click', () => this.startBot());
     this.elements.stopBot.addEventListener('click', () => this.stopBot());
+    this.elements.downloadLogs.addEventListener('click', () => this.downloadGlobalLogs());
     
     // Save settings on change
-    this.elements.commentStyle.addEventListener('change', () => this.saveSettings());
-    this.elements.maxPosts.addEventListener('change', () => this.saveSettings());
-    this.elements.enableLikes.addEventListener('change', () => this.saveSettings());
-    this.elements.enableComments.addEventListener('change', () => this.saveSettings());
-    this.elements.maxLikes.addEventListener('change', () => this.saveSettings());
-    this.elements.maxComments.addEventListener('change', () => this.saveSettings());
+    this.elements.commentStyle.addEventListener('change', () => {
+      this.saveSettings();
+      this.updateModeExplanation();
+    });
+    this.elements.maxPosts.addEventListener('change', () => {
+      this.updateCountsFromMaxPosts();
+      this.saveSettings();
+    });
+    this.elements.maxLikes.addEventListener('change', () => {
+      this.validateCounts();
+      this.saveSettings();
+    });
+    this.elements.maxComments.addEventListener('change', () => {
+      this.validateCounts();
+      this.saveSettings();
+    });
     this.elements.delayMin.addEventListener('change', () => this.saveSettings());
     this.elements.delayMax.addEventListener('change', () => this.saveSettings());
   }
@@ -160,8 +172,6 @@ class PopupController {
       await chrome.storage.sync.set({
         commentStyle: this.elements.commentStyle.value,
         maxPosts: parseInt(this.elements.maxPosts.value),
-        enableLikes: this.elements.enableLikes.checked,
-        enableComments: this.elements.enableComments.checked,
         maxLikes: parseInt(this.elements.maxLikes.value),
         maxComments: parseInt(this.elements.maxComments.value),
         delayMin: parseInt(this.elements.delayMin.value),
@@ -177,6 +187,11 @@ class PopupController {
     
     if (!apiKey || !apiKey.startsWith('sk-')) {
       this.addLog('Please save a valid OpenAI API key first', 'error');
+      return;
+    }
+
+    if (!this.validateCounts()) {
+      this.addLog('Please fix the validation error before starting the bot', 'error');
       return;
     }
 
@@ -217,8 +232,8 @@ class PopupController {
           apiKey: apiKey,
           commentStyle: this.elements.commentStyle.value,
           maxPosts: parseInt(this.elements.maxPosts.value),
-          enableLikes: this.elements.enableLikes.checked,
-          enableComments: this.elements.enableComments.checked,
+          enableLikes: true,
+          enableComments: true,
           maxLikes: parseInt(this.elements.maxLikes.value),
           maxComments: parseInt(this.elements.maxComments.value),
           delayMin: parseInt(this.elements.delayMin.value),
@@ -229,6 +244,7 @@ class PopupController {
       this.isRunning = true;
       this.updateUIState();
       this.updateStatus('Starting bot...');
+      this.clearCurrentLogs(); // Clear UI logs but keep global logs
       this.addLog('Bot started successfully', 'success');
       
     } catch (error) {
@@ -303,13 +319,27 @@ class PopupController {
   }
 
   addLog(message, level = 'info') {
+    const timestamp = new Date();
+    const timeStr = timestamp.toLocaleTimeString();
+    
+    // Add to global logs with full timestamp
+    this.globalLogs.push({
+      timestamp: timestamp.toISOString(),
+      time: timeStr,
+      message: message,
+      level: level
+    });
+    
+    // Save global logs to storage
+    this.saveGlobalLogs();
+    
+    // Display in UI
     const logEntry = document.createElement('div');
     logEntry.className = 'log-entry';
     
-    const time = new Date().toLocaleTimeString();
     const timeSpan = document.createElement('span');
     timeSpan.className = 'log-time';
-    timeSpan.textContent = `[${time}] `;
+    timeSpan.textContent = `[${timeStr}] `;
     
     const messageSpan = document.createElement('span');
     messageSpan.textContent = message;
@@ -326,10 +356,94 @@ class PopupController {
     this.elements.logContainer.appendChild(logEntry);
     this.elements.logContainer.scrollTop = this.elements.logContainer.scrollHeight;
     
-    // Keep only last 50 entries
+    // Keep only last 50 entries in UI
     while (this.elements.logContainer.children.length > 50) {
       this.elements.logContainer.removeChild(this.elements.logContainer.firstChild);
     }
+  }
+
+  updateCountsFromMaxPosts() {
+    const maxPosts = parseInt(this.elements.maxPosts.value);
+    const half = Math.floor(maxPosts / 2);
+    
+    this.elements.maxLikes.value = half;
+    this.elements.maxComments.value = maxPosts - half;
+    
+    this.validateCounts();
+  }
+
+  validateCounts() {
+    const maxPosts = parseInt(this.elements.maxPosts.value);
+    const maxLikes = parseInt(this.elements.maxLikes.value);
+    const maxComments = parseInt(this.elements.maxComments.value);
+    
+    const total = maxLikes + maxComments;
+    const validationMsg = this.elements.validationMsg;
+    
+    if (total !== maxPosts) {
+      validationMsg.textContent = `Error: Likes (${maxLikes}) + Comments (${maxComments}) = ${total}, but should equal Max Posts (${maxPosts})`;
+      validationMsg.classList.add('show');
+      return false;
+    } else {
+      validationMsg.classList.remove('show');
+      return true;
+    }
+  }
+
+  updateModeExplanation() {
+    const explanations = {
+      'adaptive': '🎯 Smart Adaptive analyzes each post and chooses the best response style: congratulations for job posts, enthusiasm for achievements, thoughtful questions for insights, and warm responses for personal stories.',
+      'oneword': '💬 1-Word Comments generates contextual single words with occasional emojis like "Amazing 🎉", "Insightful", "Brilliant 🔥" based on post content.',
+      'professional': '💼 Always Professional maintains formal business language with industry terminology for all posts.',
+      'casual': '😊 Always Casual uses friendly, conversational tone while remaining professional.',
+      'insightful': '🧠 Always Insightful provides thoughtful analysis with meaningful questions to encourage discussion.',
+      'supportive': '❤️ Always Supportive focuses on encouragement and positive reinforcement for all posts.'
+    };
+    
+    const style = this.elements.commentStyle.value;
+    this.elements.modeExplanation.textContent = explanations[style] || explanations['adaptive'];
+  }
+
+  clearCurrentLogs() {
+    this.elements.logContainer.innerHTML = '';
+  }
+
+  async saveGlobalLogs() {
+    try {
+      // Keep only last 1000 logs to prevent storage overflow
+      if (this.globalLogs.length > 1000) {
+        this.globalLogs = this.globalLogs.slice(-1000);
+      }
+      
+      await chrome.storage.sync.set({ globalLogs: this.globalLogs });
+    } catch (error) {
+      console.error('Error saving global logs:', error);
+    }
+  }
+
+  downloadGlobalLogs() {
+    if (this.globalLogs.length === 0) {
+      this.addLog('No logs available to download', 'info');
+      return;
+    }
+    
+    // Create downloadable content
+    const logContent = this.globalLogs.map(log => 
+      `${log.timestamp} [${log.level.toUpperCase()}] ${log.message}`
+    ).join('\\n');
+    
+    // Create and trigger download
+    const blob = new Blob([logContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `linkedin-bot-logs-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    this.addLog(`Downloaded ${this.globalLogs.length} log entries`, 'success');
   }
 }
 

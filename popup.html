@@ -28,36 +28,26 @@
           <option value="insightful">Always Insightful</option>
           <option value="supportive">Always Supportive</option>
         </select>
+        <div class="mode-explanation" id="modeExplanation"></div>
       </div>
       
       <div class="form-group">
         <label for="maxPosts">Max Posts to Process:</label>
-        <input type="number" id="maxPosts" value="10" min="1" max="50">
+        <input type="number" id="maxPosts" value="10" min="2" max="100">
+        <small class="form-help">Total posts to engage with</small>
       </div>
       
-      <div class="form-group">
-        <label>Actions to Perform:</label>
-        <div class="checkbox-group">
-          <label class="checkbox-label">
-            <input type="checkbox" id="enableLikes" checked>
-            Like Posts
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="enableComments" checked>
-            Comment on Posts
-          </label>
+      <div class="form-row">
+        <div class="form-group half">
+          <label for="maxLikes">Max Posts to Like:</label>
+          <input type="number" id="maxLikes" value="5" min="0" max="100">
+        </div>
+        <div class="form-group half">
+          <label for="maxComments">Max Posts to Comment:</label>
+          <input type="number" id="maxComments" value="5" min="0" max="100">
         </div>
       </div>
-      
-      <div class="form-group">
-        <label for="maxLikes">Max Posts to Like:</label>
-        <input type="number" id="maxLikes" value="15" min="0" max="100">
-      </div>
-      
-      <div class="form-group">
-        <label for="maxComments">Max Posts to Comment:</label>
-        <input type="number" id="maxComments" value="5" min="0" max="50">
-      </div>
+      <div class="validation-msg" id="validationMsg"></div>
       
       <div class="form-group">
         <label for="delayMin">Minimum Delay (seconds):</label>
@@ -95,7 +85,10 @@
     </div>
     
     <div class="logs">
-      <h4>Activity Log</h4>
+      <div class="logs-header">
+        <h4>Activity Log</h4>
+        <button id="downloadLogs" class="btn btn-small">Download All Logs</button>
+      </div>
       <div id="logContainer"></div>
     </div>
   </div>
