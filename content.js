@@ -98,7 +98,8 @@ class LinkedInBot {
     
     let likesCount = 0;
     let commentsCount = 0;
-    let processedCount = 0;
+    let actuallyProcessedCount = 0; // Count of posts we actually took action on
+    let skippedCount = 0;
     
     for (const post of posts) {
       if (!this.isRunning) {
@@ -106,8 +107,18 @@ class LinkedInBot {
         break;
       }
 
-      if (processedCount >= this.config.maxPosts) {
-        this.log(`Reached maximum posts limit (${this.config.maxPosts})`);
+      // Check if we've reached our target numbers (successful actions, not total examined posts)
+      if (actuallyProcessedCount >= this.config.maxPosts) {
+        this.log(`Reached target post processing limit (${this.config.maxPosts} successful actions)`);
+        break;
+      }
+
+      // Check if both action types have reached their individual limits
+      const canLike = this.config.enableLikes && likesCount < this.config.maxLikes;
+      const canComment = this.config.enableComments && commentsCount < this.config.maxComments;
+      
+      if (!canLike && !canComment) {
+        this.log('All individual action limits reached, stopping processing');
         break;
       }
 
@@ -115,25 +126,33 @@ class LinkedInBot {
         const actions = [];
         
         // Determine what actions to perform on this post
-        if (this.config.enableLikes && likesCount < this.config.maxLikes) {
+        if (canLike && !post.alreadyLiked) {
           actions.push('like');
         }
         
-        if (this.config.enableComments && commentsCount < this.config.maxComments) {
+        if (canComment && !post.alreadyCommented) {
           actions.push('comment');
         }
 
         if (actions.length === 0) {
-          this.log('All action limits reached, stopping processing');
-          break;
+          this.log(`Skipping post by ${post.author} - already engaged or no actions available`);
+          skippedCount++;
+          continue; // Skip this post, don't count it toward our target
         }
 
         const result = await this.processPost(post, actions);
         
-        if (result.liked) likesCount++;
-        if (result.commented) commentsCount++;
-        
-        processedCount++;
+        // Only count this as processed if we actually took an action
+        if (result.liked || result.commented) {
+          if (result.liked) likesCount++;
+          if (result.commented) commentsCount++;
+          actuallyProcessedCount++; // Only increment if we actually did something
+          
+          this.log(`Successfully processed post ${actuallyProcessedCount}/${this.config.maxPosts} by ${post.author}`);
+        } else {
+          this.log(`No actions taken on post by ${post.author}`);
+          skippedCount++;
+        }
         
         // Add random human-like delay between posts
         const delay = this.getRandomDelay();
@@ -143,14 +162,15 @@ class LinkedInBot {
       } catch (error) {
         this.log(`Error processing post: ${error.message}`, 'error');
         this.updateStats({ errors: this.stats.errors + 1 });
+        skippedCount++;
         
         // Add delay even on error to avoid rapid retries
         await this.delay(this.getRandomDelay() * 1000);
       }
     }
 
-    this.log(`Completed processing ${processedCount} posts (${likesCount} liked, ${commentsCount} commented)`);
-    this.updateStatus(`Completed - ${processedCount} processed, ${likesCount} liked, ${commentsCount} commented`);
+    this.log(`Completed! Successfully processed ${actuallyProcessedCount} posts, skipped ${skippedCount} posts (${likesCount} liked, ${commentsCount} commented)`);
+    this.updateStatus(`Completed - ${actuallyProcessedCount} processed, ${skippedCount} skipped, ${likesCount} liked, ${commentsCount} commented`);
   }
 
   async findFeedPosts() {
@@ -170,10 +190,12 @@ class LinkedInBot {
     this.log(`Found ${postElements.length} potential post elements initially`);
     
     // If we need more posts and haven't found enough, try scrolling to load more
-    while (posts.length < this.config.maxPosts && scrollAttempts < maxScrollAttempts) {
-      // Extract posts from currently visible elements
+    // We need extra posts since some will be skipped (ads, already engaged)
+    const targetPostCount = Math.max(this.config.maxPosts * 2, 20); // Get at least 2x target or 20 posts minimum
+    while (posts.length < targetPostCount && scrollAttempts < maxScrollAttempts) {
+      // Extract posts from currently visible elements - get more than we need since some will be skipped
       for (const postElement of postElements) {
-        if (posts.length >= this.config.maxPosts) break;
+        if (posts.length >= this.config.maxPosts * 2) break; // Get extra posts since some will be skipped
         
         try {
           const postData = this.extractPostData(postElement);
@@ -184,9 +206,12 @@ class LinkedInBot {
             this.log(`Successfully extracted post by ${postData.author}: "${postData.content.substring(0, 50)}..."`);
           }
         } catch (error) {
-          this.log(`Error extracting post data: ${error.message}`, 'error');
-          // Log more details for debugging
-          this.log(`Post element classes: ${postElement.className}`, 'info');
+          // Only log actual errors, not skipped posts
+          if (!error.message.includes('Skipping advertisement') && !error.message.includes('Already liked and commented')) {
+            this.log(`Error extracting post data: ${error.message}`, 'error');
+          } else {
+            this.log(`${error.message}`, 'info');
+          }
         }
       }
       
@@ -239,9 +264,9 @@ class LinkedInBot {
     
     // Check if already engaged with this post
     const alreadyEngaged = this.isAlreadyEngaged(postElement);
-    if (alreadyEngaged.liked && alreadyEngaged.commented) {
-      throw new Error('Already liked and commented on this post');
-    }
+    
+    // We will handle individual action skipping later, don't skip entire post here
+    // Just store the engagement status for later use
     
     // Find the post content using multiple selectors for LinkedIn's dynamic structure
     const contentElement = postElement.querySelector('.feed-shared-text__text-view .break-words') ||
@@ -361,45 +386,46 @@ class LinkedInBot {
   }
 
   isAdvertisement(postElement) {
-    // More specific checks for actual sponsored content
+    // Very specific checks for actual sponsored/promoted content only
     
-    // Check for specific promoted post indicators in the actor section
-    const actorElement = postElement.querySelector('.feed-shared-actor') || 
-                        postElement.querySelector('.update-components-actor');
+    // Check for explicit promoted post data attributes (most reliable)
+    const hasPromotedData = postElement.querySelector('[data-promoted-post="true"]') ||
+                           postElement.hasAttribute('data-promoted') ||
+                           postElement.classList.contains('feed-shared-update-v2--promoted');
     
-    if (actorElement) {
-      const actorText = actorElement.textContent;
-      
-      // Look for "Promoted" text specifically in actor description
-      if (actorText.includes('Promoted') || actorText.includes('Sponsored')) {
+    if (hasPromotedData) {
+      return true;
+    }
+    
+    // Check for "Promoted" or "Sponsored" text in very specific locations
+    // Look in subtitle/secondary text areas where LinkedIn puts promotion labels
+    const promotionIndicators = postElement.querySelectorAll(
+      '.feed-shared-actor__sub-description, .feed-shared-actor__supplementary-actor-info, .update-components-actor__description'
+    );
+    
+    for (const indicator of promotionIndicators) {
+      const text = indicator.textContent.trim().toLowerCase();
+      // Must be exact matches for "promoted" or "sponsored" as standalone words
+      if (text === 'promoted' || text === 'sponsored' || 
+          text.startsWith('promoted ') || text.startsWith('sponsored ')) {
         return true;
       }
     }
     
-    // Check for promoted post specific classes and attributes
-    const hasPromotedClasses = postElement.querySelector('[data-promoted-post="true"]') ||
-                              postElement.classList.contains('feed-shared-update-v2--promoted');
+    // Check for sponsored content in aria-labels (very specific)
+    const sponsoredAriaLabels = postElement.querySelector('[aria-label*="Sponsored"][aria-label*="post"]') ||
+                               postElement.querySelector('[aria-label*="Promoted"][aria-label*="post"]');
     
-    // Check for sponsored content labels using text content instead of :contains()
-    const subDescriptions = postElement.querySelectorAll('.feed-shared-actor__sub-description');
-    let hasPromotedText = false;
-    for (const desc of subDescriptions) {
-      if (desc.textContent.includes('Promoted') || desc.textContent.includes('Sponsored')) {
-        hasPromotedText = true;
-        break;
-      }
+    if (sponsoredAriaLabels) {
+      return true;
     }
     
-    // Check for sponsored content labels in aria-labels
-    const sponsoredLabels = postElement.querySelector('[aria-label*="Sponsored"]') ||
-                           postElement.querySelector('[aria-label*="Promoted"]');
-    
-    // Only flag as ad if we find specific promoted/sponsored indicators
-    return hasPromotedClasses || hasPromotedText || sponsoredLabels;
+    // If none of the specific indicators are found, it's not an ad
+    return false;
   }
 
   isAlreadyEngaged(postElement) {
-    // Check if already liked (liked button will have active/pressed state)
+    // Check if WE already liked this post (liked button will have active/pressed state)
     const likeButton = postElement.querySelector('[data-control-name="like"]') ||
                       postElement.querySelector('button[aria-label*="like"]') ||
                       postElement.querySelector('.react-button__trigger');
@@ -411,17 +437,73 @@ class LinkedInBot {
       likeButton.querySelector('.reaction-button--active')
     );
     
-    // More specific check for already commented - look for actual comment items, not just the comment section
-    const commentItems = postElement.querySelectorAll('.comments-comment-item, .comments-comment-item__main-content');
+    // Check if WE already commented - look for our own comments specifically
+    // Get the current user's name/profile info from LinkedIn's header or navigation
+    const currentUserName = this.getCurrentUserName();
+    let alreadyCommented = false;
     
-    // Only consider it as already commented if there are actual comment items visible
-    // (not just the comment input box or "Add comment" text)
-    const alreadyCommented = commentItems.length > 0;
+    if (currentUserName) {
+      // Look for comment items that belong to the current user
+      const commentItems = postElement.querySelectorAll('.comments-comment-item');
+      
+      for (const comment of commentItems) {
+        const commentAuthor = comment.querySelector('.comments-comment-item__commenter-identity .hoverable-link-text, .comments-comment-item__commenter .hoverable-link-text');
+        if (commentAuthor && commentAuthor.textContent.trim().toLowerCase().includes(currentUserName.toLowerCase())) {
+          alreadyCommented = true;
+          break;
+        }
+      }
+    } else {
+      // Fallback: be more conservative - if there are any comments, assume we might have commented
+      // This is less accurate but safer than the old logic
+      alreadyCommented = false; // Don't skip based on others' comments
+    }
     
     return {
       liked: !!alreadyLiked,
       commented: alreadyCommented
     };
+  }
+  
+  getCurrentUserName() {
+    // Try to get current user name from LinkedIn navigation/header
+    const userNameSelectors = [
+      '.global-nav__me-photo + span', // User name next to profile photo
+      '.global-nav__me-content .t-16--open', // User name in navigation
+      '.global-nav__primary-link-me-menu-trigger span:not(.visually-hidden)', // Me menu trigger
+      '[data-control-name="identity_welcome_message"] .t-16', // Welcome message
+      '.global-nav__me .artdeco-button__text' // Me button text
+    ];
+    
+    for (const selector of userNameSelectors) {
+      const element = document.querySelector(selector);
+      if (element && element.textContent && element.textContent.trim().length > 0) {
+        const userName = element.textContent.trim();
+        // Extract first and last name, ignore things like "(You)" or other additions
+        const cleanName = userName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+        if (cleanName.length > 0) {
+          this.log(`Detected current user: ${cleanName}`);
+          return cleanName;
+        }
+      }
+    }
+    
+    // Fallback: try to get from URL or other sources
+    const profileElements = document.querySelectorAll('[data-control-name="nav.settings_and_privacy"], .global-nav__me');
+    for (const element of profileElements) {
+      const title = element.title || element.getAttribute('aria-label') || '';
+      if (title.includes('View profile') || title.includes('Account for')) {
+        const nameMatch = title.match(/(?:View profile for|Account for)\s+([^,\n]+)/);
+        if (nameMatch && nameMatch[1]) {
+          const userName = nameMatch[1].trim();
+          this.log(`Detected current user from title: ${userName}`);
+          return userName;
+        }
+      }
+    }
+    
+    this.log('Could not detect current user name - will be conservative about comment checking');
+    return null;
   }
 
   findCommentButton(postElement) {
