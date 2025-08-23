@@ -392,8 +392,8 @@ class PopupController {
 
   updateModeExplanation() {
     const explanations = {
-      'adaptive': '🎯 Smart Adaptive analyzes each post and chooses the best response style: congratulations for job posts, enthusiasm for achievements, thoughtful questions for insights, and warm responses for personal stories.',
-      'oneword': '💬 1-Word Comments generates contextual single words with occasional emojis like "Amazing 🎉", "Insightful", "Brilliant 🔥" based on post content.',
+      'adaptive': '🎯 Elite Smart Adaptive performs deep content analysis, references specific details from posts, asks intelligent questions, shares micro-insights, and matches the author\'s professional level and emotional tone for highly personalized engagement.',
+      'oneword': '💎 Advanced 1-Word Comments uses sophisticated vocabulary pools (Phenomenal, Revolutionary, Paradigm-shifting) based on industry context, achievement level, and author seniority. Never repeats words within a session.',
       'professional': '💼 Always Professional maintains formal business language with industry terminology for all posts.',
       'casual': '😊 Always Casual uses friendly, conversational tone while remaining professional.',
       'insightful': '🧠 Always Insightful provides thoughtful analysis with meaningful questions to encourage discussion.',
