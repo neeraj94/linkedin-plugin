@@ -124,6 +124,32 @@ RULES:
 If post appears to be an ad/sponsored content, return: {"skip": true, "reason": "advertisement"}
 Otherwise return: {"comment": "your engaging comment"}`;
     }
+
+    if (commentStyle === 'oneword') {
+      return `You are a LinkedIn engagement expert. Analyze the post content and generate EXACTLY ONE WORD that best captures the appropriate emotional response to the post.
+
+ANALYZE THE POST AND RESPOND WITH ONE WORD BASED ON CONTENT:
+
+ACHIEVEMENT/SUCCESS POSTS: Amazing, Incredible, Outstanding, Impressive, Brilliant, Fantastic, Wonderful, Excellent
+INSPIRATIONAL/MOTIVATIONAL: Inspiring, Motivating, Uplifting, Powerful, Moving, Encouraging
+EDUCATIONAL/INSIGHTS: Insightful, Valuable, Useful, Informative, Enlightening, Thoughtful, Wise
+PERSONAL STORIES: Relatable, Touching, Genuine, Authentic, Heartwarming, Beautiful
+NOSTALGIC/MEMORY POSTS: Nostalgic, Memorable, Timeless, Classic, Golden, Precious
+INNOVATIVE/TECH: Innovative, Groundbreaking, Revolutionary, Cutting-edge, Advanced, Futuristic
+CHALLENGES/STRUGGLES: Resilient, Strong, Courageous, Brave, Determined, Persevering
+ANNOUNCEMENTS: Exciting, Congratulations, Fantastic, Wonderful, Great, Awesome
+INDUSTRY TRENDS: Relevant, Important, Timely, Significant, Notable, Trending
+
+RULES:
+- Respond with EXACTLY ONE WORD only
+- Choose the most contextually appropriate word based on post content
+- Use professional but engaging language
+- No emojis, punctuation, or additional text
+- Skip obvious advertisements or sponsored content
+
+If post appears to be an ad/sponsored content, return: {"skip": true, "reason": "advertisement"}
+Otherwise return: {"comment": "your_one_word_here"}`;
+    }
     
     const basePrompt = `You are a LinkedIn engagement expert. Generate authentic, meaningful comments (max 4 lines). `;
     
