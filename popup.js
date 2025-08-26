@@ -24,7 +24,11 @@ class PopupController {
       maxPosts: document.getElementById('maxPosts'),
       maxLikes: document.getElementById('maxLikes'),
       singleWordComments: document.getElementById('singleWordComments'),
-      explanatoryComments: document.getElementById('explanatoryComments'),
+      adaptiveComments: document.getElementById('adaptiveComments'),
+      resetSplit: document.getElementById('resetSplit'),
+      splitSubtitle: document.getElementById('splitSubtitle'),
+      splitError: document.getElementById('splitError'),
+      splitTotal: document.getElementById('splitTotal'),
       delayMin: document.getElementById('delayMin'),
       delayMax: document.getElementById('delayMax'),
       startBot: document.getElementById('startBot'),
@@ -37,6 +41,9 @@ class PopupController {
       errors: document.getElementById('errors'),
       logContainer: document.getElementById('logContainer')
     };
+    
+    // Initialize split state
+    this.isSplitOverridden = false;
   }
 
   async loadStoredData() {
@@ -45,6 +52,9 @@ class PopupController {
         'openaiApiKey',
         'maxPosts',
         'maxLikes',
+        'singleWordComments',
+        'adaptiveComments', 
+        'isSplitOverridden',
         'delayMin',
         'delayMax',
         'stats',
@@ -71,8 +81,17 @@ class PopupController {
         this.elements.delayMax.value = result.delayMax;
       }
 
-      // Calculate comment split based on maxPosts
-      this.updateCommentSplit();
+      // Load split state
+      this.isSplitOverridden = result.isSplitOverridden || false;
+      
+      if (this.isSplitOverridden && result.singleWordComments !== undefined && result.adaptiveComments !== undefined) {
+        this.elements.singleWordComments.value = result.singleWordComments;
+        this.elements.adaptiveComments.value = result.adaptiveComments;
+        this.updateSplitDisplay();
+      } else {
+        // Calculate default 70/30 split
+        this.applyDefaultSplit();
+      }
 
       if (result.stats) {
         this.stats = { ...this.stats, ...result.stats };
@@ -94,10 +113,32 @@ class PopupController {
     this.elements.downloadLogs.addEventListener('click', () => this.downloadGlobalLogs());
     
     // Save settings on change
-    this.elements.maxPosts.addEventListener('change', () => {
-      this.updateCommentSplit();
+    this.elements.maxPosts.addEventListener('input', () => {
+      if (!this.isSplitOverridden) {
+        this.applyDefaultSplit();
+      } else {
+        this.validateSplitInputs();
+      }
       this.saveSettings();
     });
+    
+    // Comment split event listeners
+    this.elements.singleWordComments.addEventListener('input', (e) => {
+      this.isSplitOverridden = true;
+      this.updateSplitSubtitle();
+      this.handleSplitChange('single', parseInt(e.target.value) || 0);
+    });
+    
+    this.elements.adaptiveComments.addEventListener('input', (e) => {
+      this.isSplitOverridden = true;
+      this.updateSplitSubtitle();
+      this.handleSplitChange('adaptive', parseInt(e.target.value) || 0);
+    });
+    
+    this.elements.resetSplit.addEventListener('click', () => {
+      this.resetToDefaultSplit();
+    });
+    
     this.elements.maxLikes.addEventListener('change', () => this.saveSettings());
     this.elements.delayMin.addEventListener('change', () => this.saveSettings());
     this.elements.delayMax.addEventListener('change', () => this.saveSettings());
@@ -143,11 +184,118 @@ class PopupController {
     }
   }
 
+  // Comment Split Logic Methods
+  applyDefaultSplit() {
+    const totalPosts = parseInt(this.elements.maxPosts.value) || 10;
+    const singleWordCount = Math.ceil(totalPosts * 0.7);
+    const adaptiveCount = totalPosts - singleWordCount;
+    
+    this.elements.singleWordComments.value = singleWordCount;
+    this.elements.adaptiveComments.value = adaptiveCount;
+    
+    this.isSplitOverridden = false;
+    this.updateSplitDisplay();
+    this.updateSplitSubtitle();
+    this.clearSplitError();
+    this.saveSettings();
+  }
+  
+  resetToDefaultSplit() {
+    this.applyDefaultSplit();
+    this.addLog('Comment split reset to default 70/30 distribution', 'success');
+  }
+  
+  handleSplitChange(changedField, newValue) {
+    const totalPosts = parseInt(this.elements.maxPosts.value) || 10;
+    const currentSingle = parseInt(this.elements.singleWordComments.value) || 0;
+    const currentAdaptive = parseInt(this.elements.adaptiveComments.value) || 0;
+    
+    // Validate bounds
+    if (newValue < 0) {
+      newValue = 0;
+    } else if (newValue > totalPosts) {
+      newValue = totalPosts;
+    }
+    
+    // Auto-adjust the other field
+    if (changedField === 'single') {
+      const adaptiveValue = totalPosts - newValue;
+      this.elements.singleWordComments.value = newValue;
+      this.elements.adaptiveComments.value = adaptiveValue;
+    } else {
+      const singleValue = totalPosts - newValue;
+      this.elements.adaptiveComments.value = newValue;
+      this.elements.singleWordComments.value = singleValue;
+    }
+    
+    this.validateSplitInputs();
+    this.updateSplitDisplay();
+    this.saveSettings();
+  }
+  
+  validateSplitInputs() {
+    const totalPosts = parseInt(this.elements.maxPosts.value) || 10;
+    const singleWordCount = parseInt(this.elements.singleWordComments.value) || 0;
+    const adaptiveCount = parseInt(this.elements.adaptiveComments.value) || 0;
+    const sum = singleWordCount + adaptiveCount;
+    
+    // Clear previous validation styles
+    this.elements.singleWordComments.classList.remove('error', 'success');
+    this.elements.adaptiveComments.classList.remove('error', 'success');
+    
+    if (sum !== totalPosts) {
+      this.showSplitError(`Values must add up to ${totalPosts} total posts (currently: ${sum})`);
+      this.elements.singleWordComments.classList.add('error');
+      this.elements.adaptiveComments.classList.add('error');
+      return false;
+    } else if (singleWordCount < 0 || adaptiveCount < 0) {
+      this.showSplitError('Values cannot be negative');
+      if (singleWordCount < 0) this.elements.singleWordComments.classList.add('error');
+      if (adaptiveCount < 0) this.elements.adaptiveComments.classList.add('error');
+      return false;
+    } else {
+      this.clearSplitError();
+      this.elements.singleWordComments.classList.add('success');
+      this.elements.adaptiveComments.classList.add('success');
+      return true;
+    }
+  }
+  
+  updateSplitDisplay() {
+    const singleWordCount = parseInt(this.elements.singleWordComments.value) || 0;
+    const adaptiveCount = parseInt(this.elements.adaptiveComments.value) || 0;
+    const total = singleWordCount + adaptiveCount;
+    
+    this.elements.splitTotal.textContent = total;
+  }
+  
+  updateSplitSubtitle() {
+    if (this.isSplitOverridden) {
+      this.elements.splitSubtitle.textContent = "Custom split (manually adjusted)";
+      this.elements.splitSubtitle.style.color = "#ed8936";
+    } else {
+      this.elements.splitSubtitle.textContent = "Auto-calculated (70% single-word, 30% adaptive)";
+      this.elements.splitSubtitle.style.color = "#718096";
+    }
+  }
+  
+  showSplitError(message) {
+    this.elements.splitError.textContent = message;
+    this.elements.splitError.style.display = 'block';
+  }
+  
+  clearSplitError() {
+    this.elements.splitError.style.display = 'none';
+  }
+
   async saveSettings() {
     try {
       await chrome.storage.sync.set({
         maxPosts: parseInt(this.elements.maxPosts.value),
         maxLikes: parseInt(this.elements.maxLikes.value),
+        singleWordComments: parseInt(this.elements.singleWordComments.value),
+        adaptiveComments: parseInt(this.elements.adaptiveComments.value),
+        isSplitOverridden: this.isSplitOverridden,
         delayMin: parseInt(this.elements.delayMin.value),
         delayMax: parseInt(this.elements.delayMax.value)
       });
@@ -336,16 +484,7 @@ class PopupController {
     }
   }
 
-  updateCommentSplit() {
-    const maxPosts = parseInt(this.elements.maxPosts.value) || 10;
-    
-    // 70% single-word, 30% explanatory
-    const singleWordCount = Math.floor(maxPosts * 0.7);
-    const explanatoryCount = maxPosts - singleWordCount;
-    
-    this.elements.singleWordComments.value = singleWordCount;
-    this.elements.explanatoryComments.value = explanatoryCount;
-  }
+  // Removed - replaced with applyDefaultSplit() method above
 
   clearCurrentLogs() {
     this.elements.logContainer.innerHTML = '';

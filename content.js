@@ -91,7 +91,7 @@ class LinkedInBot {
     let likesCount = 0;
     let commentsCount = 0;
     let singleWordCommentCount = 0;
-    let explanatoryCommentCount = 0;
+    let adaptiveCommentCount = 0;
     let postsExamined = 0;
     let skippedCount = 0;
     
@@ -99,9 +99,9 @@ class LinkedInBot {
     const targetLikes = this.config.maxLikes || 0;
     const targetComments = this.config.maxComments || 0;
     const targetSingleWord = this.config.singleWordComments || 0;
-    const targetExplanatory = this.config.explanatoryComments || 0;
+    const targetAdaptive = this.config.adaptiveComments || 0;
     
-    this.log(`Targets: ${targetLikes} likes, ${targetComments} comments (${targetSingleWord} single-word + ${targetExplanatory} explanatory)`);
+    this.log(`Targets: ${targetLikes} likes, ${targetComments} comments (${targetSingleWord} single-word + ${targetAdaptive} adaptive)`);
     
     // Start from the current position and process posts as we encounter them
     let scrollAttempts = 0;
@@ -149,11 +149,11 @@ class LinkedInBot {
             likesCount,
             commentsCount,
             singleWordCommentCount,
-            explanatoryCommentCount,
+            adaptiveCommentCount,
             targetLikes,
             targetComments,
             targetSingleWord,
-            targetExplanatory
+            targetAdaptive
           });
           
           if (actions.length === 0) {
@@ -176,8 +176,8 @@ class LinkedInBot {
               singleWordCommentCount++;
               this.log(`✓ Posted single-word comment ${singleWordCommentCount}/${targetSingleWord} on post by ${postData.author}`);
             } else {
-              explanatoryCommentCount++;
-              this.log(`✓ Posted explanatory comment ${explanatoryCommentCount}/${targetExplanatory} on post by ${postData.author}`);
+              adaptiveCommentCount++;
+              this.log(`✓ Posted adaptive comment ${adaptiveCommentCount}/${targetAdaptive} on post by ${postData.author}`);
             }
           }
           
@@ -218,7 +218,7 @@ class LinkedInBot {
     
     this.log(`Sequential processing completed!`);
     this.log(`Final results: ${postsExamined} posts examined, ${skippedCount} skipped`);
-    this.log(`Actions taken: ${likesCount} likes, ${commentsCount} comments (${singleWordCommentCount} single-word + ${explanatoryCommentCount} explanatory)`);
+    this.log(`Actions taken: ${likesCount} likes, ${commentsCount} comments (${singleWordCommentCount} single-word + ${adaptiveCommentCount} adaptive)`);
     this.updateStatus(`Completed - ${likesCount} likes, ${commentsCount} comments, ${skippedCount} skipped`);
   }
 
@@ -885,16 +885,16 @@ class LinkedInBot {
     if (shouldComment) {
       // Determine comment type based on remaining quota
       const singleWordRemaining = quotaStatus.targetSingleWord - quotaStatus.singleWordCommentCount;
-      const explanatoryRemaining = quotaStatus.targetExplanatory - quotaStatus.explanatoryCommentCount;
+      const adaptiveRemaining = quotaStatus.targetAdaptive - quotaStatus.adaptiveCommentCount;
       
-      if (singleWordRemaining > 0 && explanatoryRemaining > 0) {
+      if (singleWordRemaining > 0 && adaptiveRemaining > 0) {
         // Both types available, choose based on ratio (70/30 preference)
         const usesSingleWord = Math.random() < 0.7;
-        actions.push(usesSingleWord ? 'comment_singleword' : 'comment_explanatory');
+        actions.push(usesSingleWord ? 'comment_singleword' : 'comment_adaptive');
       } else if (singleWordRemaining > 0) {
         actions.push('comment_singleword');
-      } else if (explanatoryRemaining > 0) {
-        actions.push('comment_explanatory');
+      } else if (adaptiveRemaining > 0) {
+        actions.push('comment_adaptive');
       }
     }
     
@@ -930,7 +930,7 @@ class LinkedInBot {
         }
 
         if (action.startsWith('comment_')) {
-          const commentType = action.split('_')[1]; // 'singleword' or 'explanatory'
+          const commentType = action.split('_')[1]; // 'singleword' or 'adaptive'
           this.log(`Generating ${commentType} comment for post by ${postData.author}...`, 'info');
           
           const commentResult = await this.generateCommentByType(postData.content, commentType);

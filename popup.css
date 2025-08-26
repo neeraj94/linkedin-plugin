@@ -207,6 +207,100 @@ body {
   box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
 }
 
+/* Comment Split Section Styles */
+.comment-split-section {
+  border: 2px solid rgba(0, 119, 181, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 20px 0;
+  background: rgba(231, 243, 248, 0.3);
+}
+
+.comment-split-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.comment-split-header h4 {
+  margin: 0;
+  color: #0077b5;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.comment-split-header small {
+  color: #718096;
+  font-size: 12px;
+  flex: 1;
+  margin-left: 12px;
+}
+
+.reset-btn {
+  background: linear-gradient(135deg, #ed8936, #dd6b20) !important;
+  color: white;
+  font-size: 11px;
+  padding: 6px 12px;
+  margin: 0;
+  min-width: auto;
+}
+
+.reset-btn:hover {
+  background: linear-gradient(135deg, #dd6b20, #c05621) !important;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-group.half {
+  flex: 1;
+}
+
+.field-help {
+  color: #718096;
+  font-size: 11px;
+  font-style: italic;
+  margin-top: 4px;
+  display: block;
+}
+
+.error-message {
+  background: rgba(245, 101, 101, 0.1);
+  border: 1px solid rgba(245, 101, 101, 0.3);
+  color: #c53030;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+.split-totals {
+  text-align: center;
+  margin-top: 12px;
+  color: #4a5568;
+  font-weight: 600;
+}
+
+.split-totals span {
+  color: #0077b5;
+  font-weight: 700;
+}
+
+/* Enhanced input validation styles */
+.form-group input.error {
+  border-color: #f56565 !important;
+  box-shadow: 0 0 0 3px rgba(245, 101, 101, 0.1) !important;
+}
+
+.form-group input.success {
+  border-color: #48bb78 !important;
+}
+
 .stats {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 16px;

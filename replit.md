@@ -4,7 +4,23 @@
 
 This is a Chrome browser extension that automates LinkedIn engagement through AI-generated comments. The bot scans LinkedIn feeds, extracts post content, generates contextually appropriate comments using OpenAI's GPT-4o model, and automatically posts them to increase user engagement on the platform. The extension uses a human-like interaction pattern with configurable delays and comment styles to avoid detection as an automated tool.
 
-## Recent Changes (August 22, 2025)
+## Recent Changes (August 26, 2025)
+
+### Plugin Update - Editable Comment Split (70/30 Rule)
+- **Default Auto-Split**: Automatically splits Total Posts to Process into 70% single-word and 30% adaptive comments
+- **Editable Override**: Both comment fields are now fully editable with real-time auto-adjustment
+- **Smart Validation**: Values must always equal total posts with clear inline error messages
+- **Reset to Default**: One-click button to restore 70/30 split anytime
+- **Persistent State**: Tracks whether user has overridden default with isSplitOverridden flag
+- **Enhanced UI**: New visual indicators show auto-calculated vs custom splits with color coding
+
+### Migration to Replit Environment
+- **Server Configuration**: Updated to use Python HTTP server on port 5000 for extension file hosting
+- **Client/Server Separation**: Proper security practices implemented with extension files served via web interface
+- **Download Interface**: Created professional download page for Chrome extension installation
+- **File Structure**: Maintained all original extension files while adding Replit-compatible hosting
+
+## Previous Changes (August 22, 2025)
 
 ### AI-Powered Smart Engagement System
 - **Smart Adaptive Comments**: AI automatically chooses response style based on post content (job announcements, achievements, insights, personal stories)
