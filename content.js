@@ -85,169 +85,144 @@ class LinkedInBot {
   }
 
   async processFeedPosts() {
-    const posts = await this.findFeedPosts();
-    
-    if (posts.length === 0) {
-      this.log('No posts found in feed', 'error');
-      this.updateStatus('No posts found');
-      return;
-    }
-
-    this.log(`Found ${posts.length} posts to process`);
-    this.updateStats({ postsFound: posts.length });
+    this.log('Starting sequential post-by-post processing...');
+    this.updateStatus('Processing posts one by one...');
     
     let likesCount = 0;
     let commentsCount = 0;
-    let actuallyProcessedCount = 0; // Count of posts we actually took action on
+    let singleWordCommentCount = 0;
+    let explanatoryCommentCount = 0;
+    let postsExamined = 0;
     let skippedCount = 0;
     
-    for (const post of posts) {
-      if (!this.isRunning) {
-        this.log('Bot stopped during processing');
-        break;
-      }
-
-      // Check if we've reached our target numbers (successful actions, not total examined posts)
-      if (actuallyProcessedCount >= this.config.maxPosts) {
-        this.log(`Reached target post processing limit (${this.config.maxPosts} successful actions)`);
-        break;
-      }
-
-      // Check if both action types have reached their individual limits
-      const canLike = this.config.enableLikes && likesCount < this.config.maxLikes;
-      const canComment = this.config.enableComments && commentsCount < this.config.maxComments;
-      
-      if (!canLike && !canComment) {
-        this.log('All individual action limits reached, stopping processing');
-        break;
-      }
-
-      try {
-        const actions = [];
-        
-        // Determine what actions to perform on this post
-        if (canLike && !post.alreadyLiked) {
-          actions.push('like');
-        }
-        
-        if (canComment && !post.alreadyCommented) {
-          actions.push('comment');
-        }
-
-        if (actions.length === 0) {
-          this.log(`Skipping post by ${post.author} - already engaged or no actions available`);
-          skippedCount++;
-          continue; // Skip this post, don't count it toward our target
-        }
-
-        const result = await this.processPost(post, actions);
-        
-        // Only count this as processed if we actually took an action
-        if (result.liked || result.commented) {
-          if (result.liked) likesCount++;
-          if (result.commented) commentsCount++;
-          actuallyProcessedCount++; // Only increment if we actually did something
-          
-          this.log(`Successfully processed post ${actuallyProcessedCount}/${this.config.maxPosts} by ${post.author}`);
-        } else {
-          this.log(`No actions taken on post by ${post.author}`);
-          skippedCount++;
-        }
-        
-        // Add random human-like delay between posts
-        const delay = this.getRandomDelay();
-        this.log(`Waiting ${delay}s before next post...`);
-        await this.delay(delay * 1000);
-        
-      } catch (error) {
-        this.log(`Error processing post: ${error.message}`, 'error');
-        this.updateStats({ errors: this.stats.errors + 1 });
-        skippedCount++;
-        
-        // Add delay even on error to avoid rapid retries
-        await this.delay(this.getRandomDelay() * 1000);
-      }
-    }
-
-    this.log(`Completed! Successfully processed ${actuallyProcessedCount} posts, skipped ${skippedCount} posts (${likesCount} liked, ${commentsCount} commented)`);
-    this.updateStatus(`Completed - ${actuallyProcessedCount} processed, ${skippedCount} skipped, ${likesCount} liked, ${commentsCount} commented`);
-  }
-
-  async findFeedPosts() {
-    // Wait for feed to load - try multiple selectors
-    const feedLoaded = await this.waitForElement('.feed-shared-update-v2, .feed-shared-update-v2__container, [data-test-id="main-feed-activity-card"]', 5000);
+    // Track targets
+    const targetLikes = this.config.maxLikes || 0;
+    const targetComments = this.config.maxComments || 0;
+    const targetSingleWord = this.config.singleWordComments || 0;
+    const targetExplanatory = this.config.explanatoryComments || 0;
     
-    if (!feedLoaded) {
-      this.log('Feed not loaded, trying alternative selectors');
-    }
+    this.log(`Targets: ${targetLikes} likes, ${targetComments} comments (${targetSingleWord} single-word + ${targetExplanatory} explanatory)`);
     
-    const posts = [];
+    // Start from the current position and process posts as we encounter them
     let scrollAttempts = 0;
-    const maxScrollAttempts = 3; // Limit scrolling attempts
+    const maxScrollAttempts = 10; // Allow more scrolling for sequential processing
     
-    // Initial scan for posts
-    let postElements = document.querySelectorAll('.feed-shared-update-v2, [data-test-id="main-feed-activity-card"], .feed-shared-update-v2__container');
-    this.log(`Found ${postElements.length} potential post elements initially`);
-    
-    // If we need more posts and haven't found enough, try scrolling to load more
-    // We need extra posts since some will be skipped (ads, already engaged)
-    const targetPostCount = Math.max(this.config.maxPosts * 2, 20); // Get at least 2x target or 20 posts minimum
-    while (posts.length < targetPostCount && scrollAttempts < maxScrollAttempts) {
-      // Extract posts from currently visible elements - get more than we need since some will be skipped
-      for (const postElement of postElements) {
-        if (posts.length >= this.config.maxPosts * 2) break; // Get extra posts since some will be skipped
+    while (this.isRunning && scrollAttempts < maxScrollAttempts) {
+      // Find posts currently visible on screen
+      const visiblePosts = this.findCurrentlyVisiblePosts();
+      
+      if (visiblePosts.length === 0) {
+        this.log('No visible posts found, scrolling to load more...');
+        await this.scrollToLoadMorePosts();
+        scrollAttempts++;
+        continue;
+      }
+      
+      let processedInThisBatch = false;
+      
+      // Process each visible post
+      for (const postElement of visiblePosts) {
+        if (!this.isRunning) break;
+        
+        // Check if we've reached all our targets
+        if (likesCount >= targetLikes && commentsCount >= targetComments) {
+          this.log('All targets reached!');
+          this.isRunning = false;
+          break;
+        }
         
         try {
+          // Extract post data
           const postData = this.extractPostData(postElement);
           
-          if (postData && !this.processedPosts.has(postData.id)) {
-            posts.push(postData);
-            this.processedPosts.add(postData.id);
-            this.log(`Successfully extracted post by ${postData.author}: "${postData.content.substring(0, 50)}..."`);
+          if (!postData || this.processedPosts.has(postData.id)) {
+            continue; // Skip if we can't extract data or already processed
           }
+          
+          postsExamined++;
+          this.processedPosts.add(postData.id);
+          
+          this.log(`Examining post ${postsExamined} by ${postData.author}`);
+          
+          // Determine what actions to take randomly but respecting quotas
+          const actions = this.determineRandomActions(postData, {
+            likesCount,
+            commentsCount,
+            singleWordCommentCount,
+            explanatoryCommentCount,
+            targetLikes,
+            targetComments,
+            targetSingleWord,
+            targetExplanatory
+          });
+          
+          if (actions.length === 0) {
+            this.log(`Skipping post by ${postData.author} - already engaged or no quota remaining`);
+            skippedCount++;
+            continue;
+          }
+          
+          // Process the post with determined actions
+          const result = await this.processPostSequentially(postData, actions);
+          
+          if (result.liked) {
+            likesCount++;
+            this.log(`✓ Liked post ${likesCount}/${targetLikes} by ${postData.author}`);
+          }
+          
+          if (result.commented) {
+            commentsCount++;
+            if (result.commentType === 'singleword') {
+              singleWordCommentCount++;
+              this.log(`✓ Posted single-word comment ${singleWordCommentCount}/${targetSingleWord} on post by ${postData.author}`);
+            } else {
+              explanatoryCommentCount++;
+              this.log(`✓ Posted explanatory comment ${explanatoryCommentCount}/${targetExplanatory} on post by ${postData.author}`);
+            }
+          }
+          
+          processedInThisBatch = true;
+          
+          // Update stats
+          this.updateStats({ 
+            postsFound: postsExamined,
+            postsLiked: likesCount,
+            commentsPosted: commentsCount
+          });
+          
+          // Human-like delay between actions
+          const delay = this.getRandomDelay();
+          this.log(`Waiting ${delay}s before next post...`);
+          await this.delay(delay * 1000);
+          
         } catch (error) {
-          // Only log actual errors, not skipped posts
-          if (!error.message.includes('Skipping advertisement') && !error.message.includes('Already liked and commented')) {
-            this.log(`Error extracting post data: ${error.message}`, 'error');
-          } else {
+          if (error.message.includes('Skipping advertisement') || error.message.includes('already')) {
             this.log(`${error.message}`, 'info');
+            skippedCount++;
+          } else {
+            this.log(`Error processing post: ${error.message}`, 'error');
+            this.updateStats({ errors: this.stats.errors + 1 });
           }
         }
       }
       
-      // If we still need more posts, try scrolling to load more
-      if (posts.length < this.config.maxPosts && scrollAttempts < maxScrollAttempts) {
+      // If we didn't process any posts in this batch, scroll down
+      if (!processedInThisBatch) {
+        this.log('No posts processed in this batch, scrolling to find more...');
+        await this.scrollToLoadMorePosts();
         scrollAttempts++;
-        this.log(`Scrolling to load more posts (attempt ${scrollAttempts}/${maxScrollAttempts})...`);
-        
-        // Scroll down like a human - smooth and varied
-        const currentPostCount = postElements.length;
-        const scrollAmount = 400 + Math.random() * 600; // Random scroll between 400-1000px
-        window.scrollTo({ 
-          top: window.scrollY + scrollAmount, 
-          behavior: 'smooth' 
-        });
-        
-        // Human-like pause - varied timing
-        const pauseTime = 1500 + Math.random() * 1500; // 1.5-3 seconds
-        await this.delay(pauseTime);
-        
-        // Check for new posts
-        postElements = document.querySelectorAll('.feed-shared-update-v2, [data-test-id="main-feed-activity-card"], .feed-shared-update-v2__container');
-        
-        if (postElements.length === currentPostCount) {
-          // No new posts loaded, stop scrolling
-          this.log('No new posts loaded after scrolling, stopping scroll attempts');
-          break;
-        } else {
-          this.log(`After scrolling: found ${postElements.length} total potential post elements`);
-        }
+      } else {
+        scrollAttempts = 0; // Reset scroll attempts if we found posts to process
       }
     }
     
-    this.log(`Final result: Found ${posts.length} processable posts out of ${postElements.length} total elements`);
-    return posts;
+    this.log(`Sequential processing completed!`);
+    this.log(`Final results: ${postsExamined} posts examined, ${skippedCount} skipped`);
+    this.log(`Actions taken: ${likesCount} likes, ${commentsCount} comments (${singleWordCommentCount} single-word + ${explanatoryCommentCount} explanatory)`);
+    this.updateStatus(`Completed - ${likesCount} likes, ${commentsCount} comments, ${skippedCount} skipped`);
   }
+
+  // Legacy function - no longer used since we switched to sequential processing
 
   extractPostData(postElement) {
     // Debug: Log post element structure
@@ -834,6 +809,178 @@ class LinkedInBot {
       chrome.runtime.sendMessage(message);
     } catch (error) {
       console.error('Failed to send message:', error);
+    }
+  }
+  
+  findCurrentlyVisiblePosts() {
+    // Find posts currently visible in viewport or near it
+    const postElements = document.querySelectorAll('.feed-shared-update-v2, [data-test-id="main-feed-activity-card"], .feed-shared-update-v2__container');
+    const visiblePosts = [];
+    
+    for (const postElement of postElements) {
+      // Check if post is in or near viewport
+      const rect = postElement.getBoundingClientRect();
+      const isVisible = rect.top < window.innerHeight + 200 && rect.bottom > -200; // Include posts 200px outside viewport
+      
+      if (isVisible && !this.processedPosts.has(this.generatePostId(postElement))) {
+        visiblePosts.push(postElement);
+      }
+    }
+    
+    this.log(`Found ${visiblePosts.length} visible posts to examine`);
+    return visiblePosts;
+  }
+  
+  async scrollToLoadMorePosts() {
+    // Scroll down smoothly to load more posts
+    const scrollAmount = 300 + Math.random() * 400; // Random scroll between 300-700px
+    window.scrollBy({ 
+      top: scrollAmount, 
+      behavior: 'smooth' 
+    });
+    
+    // Wait for content to load
+    const pauseTime = 1000 + Math.random() * 1000; // 1-2 seconds
+    await this.delay(pauseTime);
+  }
+  
+  generatePostId(postElement) {
+    // Generate a consistent ID for a post element
+    const authorElement = postElement.querySelector('.feed-shared-actor__title a, .update-components-actor__title a');
+    const contentElement = postElement.querySelector('.feed-shared-text__text-view, .feed-shared-text, .update-components-text');
+    
+    const author = authorElement ? authorElement.textContent.trim() : 'unknown';
+    const content = contentElement ? contentElement.textContent.trim().substring(0, 50) : 'no-content';
+    
+    return `${author}_${content}`.replace(/[^a-zA-Z0-9]/g, '_');
+  }
+  
+  determineRandomActions(postData, quotaStatus) {
+    const actions = [];
+    
+    // Check if we can like this post
+    const canLike = !postData.alreadyLiked && 
+                   quotaStatus.likesCount < quotaStatus.targetLikes;
+    
+    // Check if we can comment on this post
+    const canComment = !postData.alreadyCommented && 
+                      quotaStatus.commentsCount < quotaStatus.targetComments;
+    
+    if (!canLike && !canComment) {
+      return actions; // No actions possible
+    }
+    
+    // Random decision making - more natural distribution
+    const likeChance = 0.6; // 60% chance to like if possible
+    const commentChance = 0.4; // 40% chance to comment if possible
+    
+    // Sometimes do both, sometimes just one
+    const shouldLike = canLike && Math.random() < likeChance;
+    const shouldComment = canComment && Math.random() < commentChance;
+    
+    if (shouldLike) {
+      actions.push('like');
+    }
+    
+    if (shouldComment) {
+      // Determine comment type based on remaining quota
+      const singleWordRemaining = quotaStatus.targetSingleWord - quotaStatus.singleWordCommentCount;
+      const explanatoryRemaining = quotaStatus.targetExplanatory - quotaStatus.explanatoryCommentCount;
+      
+      if (singleWordRemaining > 0 && explanatoryRemaining > 0) {
+        // Both types available, choose based on ratio (70/30 preference)
+        const usesSingleWord = Math.random() < 0.7;
+        actions.push(usesSingleWord ? 'comment_singleword' : 'comment_explanatory');
+      } else if (singleWordRemaining > 0) {
+        actions.push('comment_singleword');
+      } else if (explanatoryRemaining > 0) {
+        actions.push('comment_explanatory');
+      }
+    }
+    
+    return actions;
+  }
+  
+  async processPostSequentially(postData, actions) {
+    this.log(`Processing post by ${postData.author} with actions: ${actions.join(', ')}...`);
+    this.updateStatus(`Processing post by ${postData.author}`);
+
+    const result = { liked: false, commented: false, commentType: null };
+
+    // Scroll to post
+    postData.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await this.delay(this.getRandomDelay(1, 2) * 1000);
+
+    // Process actions in random order for more natural behavior
+    const shuffledActions = [...actions].sort(() => Math.random() - 0.5);
+
+    for (const action of shuffledActions) {
+      if (!this.isRunning) break;
+
+      try {
+        if (action === 'like') {
+          await this.likePost(postData);
+          result.liked = true;
+          this.log(`✓ Liked post by ${postData.author}`, 'success');
+          
+          // Random delay between actions
+          if (shuffledActions.length > 1) {
+            await this.delay(this.getRandomDelay(0.5, 2) * 1000);
+          }
+        }
+
+        if (action.startsWith('comment_')) {
+          const commentType = action.split('_')[1]; // 'singleword' or 'explanatory'
+          this.log(`Generating ${commentType} comment for post by ${postData.author}...`, 'info');
+          
+          const commentResult = await this.generateCommentByType(postData.content, commentType);
+          
+          if (commentResult && commentResult.skip) {
+            this.log(`⏭️ Skipped post by ${postData.author}: ${commentResult.reason}`, 'info');
+          } else if (commentResult && commentResult.comment) {
+            this.log(`Generated ${commentType} comment: "${commentResult.comment}"`, 'info');
+            await this.postComment(postData, commentResult.comment);
+            result.commented = true;
+            result.commentType = commentType;
+            this.log(`✓ Commented on post by ${postData.author}: "${commentResult.comment}"`, 'success');
+          } else {
+            this.log(`Failed to generate ${commentType} comment for post by ${postData.author}`, 'error');
+            this.updateStats({ errors: this.stats.errors + 1 });
+          }
+        }
+      } catch (error) {
+        this.log(`Error with ${action} on post by ${postData.author}: ${error.message}`, 'error');
+      }
+    }
+
+    return result;
+  }
+  
+  async generateCommentByType(postContent, commentType) {
+    // Use appropriate comment style based on type
+    const commentStyle = commentType === 'singleword' ? 'oneword' : 'adaptive';
+    return await this.generateComment(postContent, commentStyle);
+  }
+  
+  async generateComment(postContent, commentStyle = 'adaptive') {
+    try {
+      this.log(`Generating ${commentStyle} comment...`, 'info');
+      
+      const response = await chrome.runtime.sendMessage({
+        type: 'GENERATE_COMMENT',
+        postContent: postContent,
+        commentStyle: commentStyle,
+        apiKey: this.config.apiKey
+      });
+      
+      if (response && response.success) {
+        return response.result;
+      } else {
+        throw new Error(response?.error || 'Failed to generate comment');
+      }
+    } catch (error) {
+      this.log(`Comment generation error: ${error.message}`, 'error');
+      throw error;
     }
   }
 }

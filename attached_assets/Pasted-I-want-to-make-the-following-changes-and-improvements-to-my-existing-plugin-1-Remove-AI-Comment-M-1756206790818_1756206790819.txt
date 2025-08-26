@@ -1,0 +1,95 @@
+I want to make the following changes and improvements to my existing plugin:
+
+1. Remove AI Comment Mode
+
+The "AI Comment Mode" option should be removed entirely.
+
+There should be no toggle or selection for AI comment mode.
+
+By default, the plugin should only support the free/manual mode with the existing configuration fields.
+
+2. Categorization of Comments
+
+Keep existing fields:
+
+Total Posts to Process
+
+Total Likes
+
+Total Comments
+
+Update Total Comments to support two sub-categories:
+
+Single-word comments (e.g., “Great!”, “Nice!”, “Good work!”)
+
+Explanatory comments (2–3 line researched or elaborative comments).
+
+By default, use a 70/30 split:
+
+70% single-word comments
+
+30% explanatory comments
+
+Example:
+
+If Total Posts to Process = 10, then automatically populate 7 single-word and 3 explanatory comments.
+
+3. Behavior of "Total Posts to Process"
+
+Total Posts to Process should only apply to comments.
+
+Total Likes should remain an independent counter, not linked to posts to process.
+
+Example:
+
+If Total Posts to Process = 10, it means 10 posts will receive comments.
+
+If Total Likes = 10, it means 10 posts will get likes (not necessarily the same ones).
+
+4. Processing Algorithm
+
+Fix the current scrolling issue:
+
+Currently, the plugin scrolls through all posts first and then starts applying likes/comments.
+
+Expected behavior: Process each post as you encounter it (like or comment or both), then continue scrolling to the next one until the configured counts are fulfilled.
+
+The algorithm should:
+
+Start at the top of the feed.
+
+For each post, randomly decide whether to like, comment, or both (based on quotas).
+
+Move to the next post and repeat until all configured likes and comments are processed.
+
+Ensure it doesn’t restart from the top after every cycle.
+
+5. Randomization of Actions
+
+Liking and commenting should appear natural and random.
+
+It should not be:
+
+"Like first 10 posts, then comment on next 10 posts".
+
+Instead, it should:
+
+Sometimes like without commenting.
+
+Sometimes comment without liking.
+
+Sometimes do both on the same post.
+
+The selection should follow the defined counts but distribute randomly across the feed.
+
+✅ End Result:
+
+No AI comment mode.
+
+Comments split into 70% single-word, 30% explanatory (auto-calculated).
+
+Independent counters for total likes and total comments.
+
+Sequential scrolling with per-post action execution.
+
+Random natural distribution of likes and comments across the feed.

@@ -18,36 +18,35 @@
         <button id="saveKey" class="btn btn-small">Save</button>
       </div>
       
+      
       <div class="form-group">
-        <label for="commentStyle">AI Comment Mode:</label>
-        <select id="commentStyle">
-          <option value="adaptive">Smart Adaptive (Recommended)</option>
-          <option value="oneword">1-Word Comments</option>
-          <option value="professional">Always Professional</option>
-          <option value="casual">Always Casual</option>
-          <option value="insightful">Always Insightful</option>
-          <option value="supportive">Always Supportive</option>
-        </select>
-        <div class="mode-explanation" id="modeExplanation"></div>
+        <label for="maxPosts">Total Posts to Process:</label>
+        <input type="number" id="maxPosts" value="10" min="1" max="100">
+        <small class="form-help">Total posts to comment on</small>
       </div>
       
       <div class="form-group">
-        <label for="maxPosts">Max Posts to Process:</label>
-        <input type="number" id="maxPosts" value="10" min="2" max="100">
-        <small class="form-help">Total posts to engage with</small>
+        <label for="maxLikes">Total Likes:</label>
+        <input type="number" id="maxLikes" value="10" min="0" max="100">
+        <small class="form-help">Posts to like (independent of comments)</small>
       </div>
       
-      <div class="form-row">
-        <div class="form-group half">
-          <label for="maxLikes">Max Posts to Like:</label>
-          <input type="number" id="maxLikes" value="5" min="0" max="100">
+      <div class="comment-split-section">
+        <div class="comment-split-header">
+          <h4>Comment Distribution</h4>
+          <small>Automatically calculated from Total Posts to Process</small>
         </div>
-        <div class="form-group half">
-          <label for="maxComments">Max Posts to Comment:</label>
-          <input type="number" id="maxComments" value="5" min="0" max="100">
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="singleWordComments">Single-word Comments (70%):</label>
+            <input type="number" id="singleWordComments" value="7" min="0" readonly>
+          </div>
+          <div class="form-group half">
+            <label for="explanatoryComments">Explanatory Comments (30%):</label>
+            <input type="number" id="explanatoryComments" value="3" min="0" readonly>
+          </div>
         </div>
       </div>
-      <div class="validation-msg" id="validationMsg"></div>
       
       <div class="form-group">
         <label for="delayMin">Minimum Delay (seconds):</label>

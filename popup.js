@@ -15,19 +15,16 @@ class PopupController {
     this.loadStoredData();
     this.setupEventListeners();
     this.setupMessageListener();
-    this.updateModeExplanation();
   }
 
   initializeElements() {
     this.elements = {
       apiKey: document.getElementById('apiKey'),
       saveKey: document.getElementById('saveKey'),
-      commentStyle: document.getElementById('commentStyle'),
-      modeExplanation: document.getElementById('modeExplanation'),
       maxPosts: document.getElementById('maxPosts'),
       maxLikes: document.getElementById('maxLikes'),
-      maxComments: document.getElementById('maxComments'),
-      validationMsg: document.getElementById('validationMsg'),
+      singleWordComments: document.getElementById('singleWordComments'),
+      explanatoryComments: document.getElementById('explanatoryComments'),
       delayMin: document.getElementById('delayMin'),
       delayMax: document.getElementById('delayMax'),
       startBot: document.getElementById('startBot'),
@@ -46,10 +43,8 @@ class PopupController {
     try {
       const result = await chrome.storage.sync.get([
         'openaiApiKey',
-        'commentStyle',
         'maxPosts',
         'maxLikes',
-        'maxComments',
         'delayMin',
         'delayMax',
         'stats',
@@ -60,23 +55,12 @@ class PopupController {
         this.elements.apiKey.value = result.openaiApiKey;
       }
 
-      if (result.commentStyle) {
-        this.elements.commentStyle.value = result.commentStyle;
-      }
-
       if (result.maxPosts) {
         this.elements.maxPosts.value = result.maxPosts;
       }
 
-      // Auto-populate likes and comments based on max posts
-      this.updateCountsFromMaxPosts();
-
       if (result.maxLikes) {
         this.elements.maxLikes.value = result.maxLikes;
-      }
-
-      if (result.maxComments) {
-        this.elements.maxComments.value = result.maxComments;
       }
 
       if (result.delayMin) {
@@ -86,6 +70,9 @@ class PopupController {
       if (result.delayMax) {
         this.elements.delayMax.value = result.delayMax;
       }
+
+      // Calculate comment split based on maxPosts
+      this.updateCommentSplit();
 
       if (result.stats) {
         this.stats = { ...this.stats, ...result.stats };
@@ -107,22 +94,11 @@ class PopupController {
     this.elements.downloadLogs.addEventListener('click', () => this.downloadGlobalLogs());
     
     // Save settings on change
-    this.elements.commentStyle.addEventListener('change', () => {
-      this.saveSettings();
-      this.updateModeExplanation();
-    });
     this.elements.maxPosts.addEventListener('change', () => {
-      this.updateCountsFromMaxPosts();
+      this.updateCommentSplit();
       this.saveSettings();
     });
-    this.elements.maxLikes.addEventListener('change', () => {
-      this.validateCounts();
-      this.saveSettings();
-    });
-    this.elements.maxComments.addEventListener('change', () => {
-      this.validateCounts();
-      this.saveSettings();
-    });
+    this.elements.maxLikes.addEventListener('change', () => this.saveSettings());
     this.elements.delayMin.addEventListener('change', () => this.saveSettings());
     this.elements.delayMax.addEventListener('change', () => this.saveSettings());
   }
@@ -170,10 +146,8 @@ class PopupController {
   async saveSettings() {
     try {
       await chrome.storage.sync.set({
-        commentStyle: this.elements.commentStyle.value,
         maxPosts: parseInt(this.elements.maxPosts.value),
         maxLikes: parseInt(this.elements.maxLikes.value),
-        maxComments: parseInt(this.elements.maxComments.value),
         delayMin: parseInt(this.elements.delayMin.value),
         delayMax: parseInt(this.elements.delayMax.value)
       });
@@ -190,10 +164,6 @@ class PopupController {
       return;
     }
 
-    if (!this.validateCounts()) {
-      this.addLog('Please fix the validation error before starting the bot', 'error');
-      return;
-    }
 
     try {
       // Get current active tab
@@ -226,16 +196,21 @@ class PopupController {
       }
 
       // Send start message to content script
+      const maxPosts = parseInt(this.elements.maxPosts.value);
+      const singleWordCount = parseInt(this.elements.singleWordComments.value);
+      const explanatoryCount = parseInt(this.elements.explanatoryComments.value);
+      
       await chrome.tabs.sendMessage(tab.id, {
         type: 'START_BOT',
         config: {
           apiKey: apiKey,
-          commentStyle: this.elements.commentStyle.value,
-          maxPosts: parseInt(this.elements.maxPosts.value),
+          maxPosts: maxPosts,
           enableLikes: true,
           enableComments: true,
           maxLikes: parseInt(this.elements.maxLikes.value),
-          maxComments: parseInt(this.elements.maxComments.value),
+          maxComments: maxPosts, // Total comments = total posts to process
+          singleWordComments: singleWordCount,
+          explanatoryComments: explanatoryCount,
           delayMin: parseInt(this.elements.delayMin.value),
           delayMax: parseInt(this.elements.delayMax.value)
         }
@@ -282,7 +257,6 @@ class PopupController {
     this.elements.startBot.disabled = this.isRunning;
     this.elements.stopBot.disabled = !this.isRunning;
     this.elements.apiKey.disabled = this.isRunning;
-    this.elements.commentStyle.disabled = this.isRunning;
     this.elements.maxPosts.disabled = this.isRunning;
   }
 
@@ -362,46 +336,15 @@ class PopupController {
     }
   }
 
-  updateCountsFromMaxPosts() {
-    const maxPosts = parseInt(this.elements.maxPosts.value);
-    const half = Math.floor(maxPosts / 2);
+  updateCommentSplit() {
+    const maxPosts = parseInt(this.elements.maxPosts.value) || 10;
     
-    this.elements.maxLikes.value = half;
-    this.elements.maxComments.value = maxPosts - half;
+    // 70% single-word, 30% explanatory
+    const singleWordCount = Math.floor(maxPosts * 0.7);
+    const explanatoryCount = maxPosts - singleWordCount;
     
-    this.validateCounts();
-  }
-
-  validateCounts() {
-    const maxPosts = parseInt(this.elements.maxPosts.value);
-    const maxLikes = parseInt(this.elements.maxLikes.value);
-    const maxComments = parseInt(this.elements.maxComments.value);
-    
-    const total = maxLikes + maxComments;
-    const validationMsg = this.elements.validationMsg;
-    
-    if (total !== maxPosts) {
-      validationMsg.textContent = `Error: Likes (${maxLikes}) + Comments (${maxComments}) = ${total}, but should equal Max Posts (${maxPosts})`;
-      validationMsg.classList.add('show');
-      return false;
-    } else {
-      validationMsg.classList.remove('show');
-      return true;
-    }
-  }
-
-  updateModeExplanation() {
-    const explanations = {
-      'adaptive': '🎯 Elite Smart Adaptive performs deep content analysis, references specific details from posts, asks intelligent questions, shares micro-insights, and matches the author\'s professional level and emotional tone for highly personalized engagement.',
-      'oneword': '💎 Advanced 1-Word Comments uses sophisticated vocabulary pools (Phenomenal, Revolutionary, Paradigm-shifting) based on industry context, achievement level, and author seniority. Never repeats words within a session.',
-      'professional': '💼 Always Professional maintains formal business language with industry terminology for all posts.',
-      'casual': '😊 Always Casual uses friendly, conversational tone while remaining professional.',
-      'insightful': '🧠 Always Insightful provides thoughtful analysis with meaningful questions to encourage discussion.',
-      'supportive': '❤️ Always Supportive focuses on encouragement and positive reinforcement for all posts.'
-    };
-    
-    const style = this.elements.commentStyle.value;
-    this.elements.modeExplanation.textContent = explanations[style] || explanations['adaptive'];
+    this.elements.singleWordComments.value = singleWordCount;
+    this.elements.explanatoryComments.value = explanatoryCount;
   }
 
   clearCurrentLogs() {
