@@ -3,99 +3,145 @@
 <head>
   <meta charset="utf-8">
   <link rel="stylesheet" href="popup.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
+    <!-- Header Section -->
     <div class="header">
-      <h2>LinkedIn AI Engagement</h2>
-      <div class="status" id="status">Ready</div>
-    </div>
-    
-    <div class="config-section">
-      <div class="form-group">
-        <label for="apiKey">OpenAI API Key:</label>
-        <input type="password" id="apiKey" placeholder="sk-...">
-        <button id="saveKey" class="btn btn-small">Save</button>
-      </div>
-      
-      
-      <div class="form-group">
-        <label for="maxPosts">Total Posts to Process:</label>
-        <input type="number" id="maxPosts" value="10" min="1" max="100">
-        <small class="form-help">Total posts to comment on</small>
-      </div>
-      
-      <div class="form-group">
-        <label for="maxLikes">Total Likes:</label>
-        <input type="number" id="maxLikes" value="10" min="0" max="100">
-        <small class="form-help">Posts to like (independent of comments)</small>
-      </div>
-      
-      <div class="comment-split-section">
-        <div class="comment-split-header">
-          <h4>Comment Distribution</h4>
-          <small id="splitSubtitle">Auto-calculated (70% single-word, 30% adaptive)</small>
-          <button id="resetSplit" class="btn btn-small reset-btn">Reset to Default</button>
+      <div class="header-content">
+        <div class="logo">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" fill="#0A66C2"/>
+          </svg>
+          <h1>AI Engagement</h1>
         </div>
-        <div class="form-row">
-          <div class="form-group half">
-            <label for="singleWordComments">Single-word Comments:</label>
+        <div class="status" id="status">Ready</div>
+      </div>
+    </div>
+
+    <!-- Quick Setup Card -->
+    <div class="card setup-card">
+      <div class="card-header">
+        <h3>🔑 Setup</h3>
+      </div>
+      <div class="input-group api-key-group">
+        <input type="password" id="apiKey" placeholder="Enter your OpenAI API key (sk-...)">
+        <button id="saveKey" class="btn-save">Save</button>
+      </div>
+    </div>
+
+    <!-- Settings Card -->
+    <div class="card settings-card">
+      <div class="card-header">
+        <h3>⚙️ Settings</h3>
+      </div>
+      
+      <!-- Main Settings Row -->
+      <div class="settings-row">
+        <div class="setting-item">
+          <label>Posts to Process</label>
+          <input type="number" id="maxPosts" value="10" min="1" max="100">
+        </div>
+        <div class="setting-item">
+          <label>Posts to Like</label>
+          <input type="number" id="maxLikes" value="10" min="0" max="100">
+        </div>
+      </div>
+
+      <!-- Comment Distribution -->
+      <div class="comment-split-card">
+        <div class="split-header">
+          <span class="split-title">Comment Types</span>
+          <small id="splitSubtitle" class="split-subtitle">Auto: 70% Quick, 30% Smart</small>
+          <button id="resetSplit" class="reset-btn">Reset</button>
+        </div>
+        
+        <div class="split-inputs">
+          <div class="split-item">
+            <label>Quick</label>
             <input type="number" id="singleWordComments" value="7" min="0">
-            <small class="field-help">Quick responses (wow, great, love this)</small>
+            <span class="split-help">wow, great, love this</span>
           </div>
-          <div class="form-group half">
-            <label for="adaptiveComments">Adaptive Comments:</label>
+          <div class="split-divider">+</div>
+          <div class="split-item">
+            <label>Smart</label>
             <input type="number" id="adaptiveComments" value="3" min="0">
-            <small class="field-help">Contextual AI responses</small>
+            <span class="split-help">AI contextual responses</span>
           </div>
         </div>
-        <div id="splitError" class="error-message" style="display: none;"></div>
-        <div class="split-totals">
-          <small>Total: <span id="splitTotal">10</span> comments</small>
+        
+        <div id="splitError" class="error-message"></div>
+        <div class="split-total">
+          Total: <span id="splitTotal">10</span> comments
         </div>
       </div>
-      
-      <div class="form-group">
-        <label for="delayMin">Minimum Delay (seconds):</label>
-        <input type="number" id="delayMin" value="2" min="1" max="30">
-      </div>
-      
-      <div class="form-group">
-        <label for="delayMax">Maximum Delay (seconds):</label>
-        <input type="number" id="delayMax" value="8" min="2" max="60">
+
+      <!-- Timing Settings -->
+      <div class="timing-card">
+        <span class="timing-title">⏱️ Human-like Timing</span>
+        <div class="timing-inputs">
+          <div class="timing-item">
+            <label>Min Delay</label>
+            <input type="number" id="delayMin" value="2" min="1" max="30">
+            <span>sec</span>
+          </div>
+          <div class="timing-dash">-</div>
+          <div class="timing-item">
+            <label>Max Delay</label>
+            <input type="number" id="delayMax" value="8" min="2" max="60">
+            <span>sec</span>
+          </div>
+        </div>
       </div>
     </div>
     
+    <!-- Control Buttons -->
     <div class="controls">
-      <button id="startBot" class="btn btn-primary">Start Engagement</button>
-      <button id="stopBot" class="btn btn-secondary" disabled>Stop</button>
+      <button id="startBot" class="btn btn-primary">
+        <span class="btn-icon">▶</span>
+        Start Engagement
+      </button>
+      <button id="stopBot" class="btn btn-stop" disabled>
+        <span class="btn-icon">⏹</span>
+        Stop
+      </button>
     </div>
     
-    <div class="stats">
-      <div class="stat-item">
-        <span class="stat-label">Posts Found:</span>
-        <span id="postsFound">0</span>
+    <!-- Stats Dashboard -->
+    <div class="card stats-card">
+      <div class="card-header">
+        <h3>📊 Live Stats</h3>
       </div>
-      <div class="stat-item">
-        <span class="stat-label">Posts Liked:</span>
-        <span id="postsLiked">0</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label">Comments Posted:</span>
-        <span id="commentsPosted">0</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label">Errors:</span>
-        <span id="errors">0</span>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value" id="postsFound">0</div>
+          <div class="stat-label">Found</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="postsLiked">0</div>
+          <div class="stat-label">Liked</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="commentsPosted">0</div>
+          <div class="stat-label">Comments</div>
+        </div>
+        <div class="stat-box error-stat">
+          <div class="stat-value" id="errors">0</div>
+          <div class="stat-label">Errors</div>
+        </div>
       </div>
     </div>
     
-    <div class="logs">
-      <div class="logs-header">
-        <h4>Activity Log</h4>
-        <button id="downloadLogs" class="btn btn-small">Download All Logs</button>
+    <!-- Activity Log -->
+    <div class="card logs-card">
+      <div class="card-header">
+        <h3>📝 Activity Log</h3>
+        <button id="downloadLogs" class="btn-download">Download</button>
       </div>
-      <div id="logContainer"></div>
+      <div id="logContainer" class="log-container"></div>
     </div>
   </div>
   

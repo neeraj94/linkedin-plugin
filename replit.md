@@ -6,8 +6,16 @@ This is a Chrome browser extension that automates LinkedIn engagement through AI
 
 ## Recent Changes (August 26, 2025)
 
+### Modern UI Redesign - Attractive & Simplified Interface
+- **Professional Design**: Complete UI overhaul with modern card-based layout and glassmorphism effects
+- **LinkedIn Branding**: Official LinkedIn colors and professional typography (Inter font)
+- **Simplified Layout**: Intuitive organization with Setup, Settings, Stats, and Activity sections
+- **Enhanced Visual Hierarchy**: Clear card headers with emoji icons and improved content grouping
+- **Modern Components**: Gradient buttons, hover effects, smooth transitions, and better spacing
+- **Improved Usability**: Cleaner input fields, better validation states, and streamlined controls
+
 ### Plugin Update - Editable Comment Split (70/30 Rule)
-- **Default Auto-Split**: Automatically splits Total Posts to Process into 70% single-word and 30% adaptive comments
+- **Default Auto-Split**: Automatically splits Total Posts to Process into 70% single-word and 30% adaptive comments  
 - **Editable Override**: Both comment fields are now fully editable with real-time auto-adjustment
 - **Smart Validation**: Values must always equal total posts with clear inline error messages
 - **Reset to Default**: One-click button to restore 70/30 split anytime

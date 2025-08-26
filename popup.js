@@ -271,21 +271,25 @@ class PopupController {
   
   updateSplitSubtitle() {
     if (this.isSplitOverridden) {
-      this.elements.splitSubtitle.textContent = "Custom split (manually adjusted)";
-      this.elements.splitSubtitle.style.color = "#ed8936";
+      this.elements.splitSubtitle.textContent = "Custom: User-defined split";
+      this.elements.splitSubtitle.style.color = "#ea580c";
+      this.elements.splitSubtitle.style.backgroundColor = "rgba(249, 115, 22, 0.1)";
+      this.elements.splitSubtitle.style.borderColor = "rgba(249, 115, 22, 0.3)";
     } else {
-      this.elements.splitSubtitle.textContent = "Auto-calculated (70% single-word, 30% adaptive)";
-      this.elements.splitSubtitle.style.color = "#718096";
+      this.elements.splitSubtitle.textContent = "Auto: 70% Quick, 30% Smart";
+      this.elements.splitSubtitle.style.color = "#3b82f6";
+      this.elements.splitSubtitle.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
+      this.elements.splitSubtitle.style.borderColor = "rgba(59, 130, 246, 0.3)";
     }
   }
   
   showSplitError(message) {
     this.elements.splitError.textContent = message;
-    this.elements.splitError.style.display = 'block';
+    this.elements.splitError.classList.add('show');
   }
   
   clearSplitError() {
-    this.elements.splitError.style.display = 'none';
+    this.elements.splitError.classList.remove('show');
   }
 
   async saveSettings() {
