@@ -346,7 +346,7 @@ class PopupController {
       // Send start message to content script
       const maxPosts = parseInt(this.elements.maxPosts.value);
       const singleWordCount = parseInt(this.elements.singleWordComments.value);
-      const explanatoryCount = parseInt(this.elements.explanatoryComments.value);
+      const adaptiveCount = parseInt(this.elements.adaptiveComments.value);
       
       await chrome.tabs.sendMessage(tab.id, {
         type: 'START_BOT',
@@ -358,7 +358,7 @@ class PopupController {
           maxLikes: parseInt(this.elements.maxLikes.value),
           maxComments: maxPosts, // Total comments = total posts to process
           singleWordComments: singleWordCount,
-          explanatoryComments: explanatoryCount,
+          adaptiveComments: adaptiveCount,
           delayMin: parseInt(this.elements.delayMin.value),
           delayMax: parseInt(this.elements.delayMax.value)
         }
