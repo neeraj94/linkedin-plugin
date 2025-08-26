@@ -144,7 +144,22 @@ class LinkedInBot {
           
           this.log(`Examining post ${postsExamined} by ${postData.author}`);
           
-          // Determine what actions to take randomly but respecting quotas
+          // Check if post is an advertisement first
+          if (this.isAdvertisement(postElement)) {
+            this.log(`Skipping advertisement/sponsored post by ${postData.author}`, 'info');
+            skippedCount++;
+            continue;
+          }
+          
+          // Log engagement status
+          if (postData.alreadyLiked) {
+            this.log(`Post by ${postData.author} already liked - skipping like action`, 'info');
+          }
+          if (postData.alreadyCommented) {
+            this.log(`Post by ${postData.author} already commented - skipping comment action`, 'info');
+          }
+          
+          // Determine what actions to take randomly but respecting quotas and engagement status
           const actions = this.determineRandomActions(postData, {
             likesCount,
             commentsCount,
@@ -157,7 +172,27 @@ class LinkedInBot {
           });
           
           if (actions.length === 0) {
-            this.log(`Skipping post by ${postData.author} - already engaged or no quota remaining`);
+            let skipReason = 'No actions available - ';
+            const reasons = [];
+            
+            if (postData.alreadyLiked && postData.alreadyCommented) {
+              reasons.push('already liked and commented');
+            } else if (postData.alreadyLiked) {
+              reasons.push('already liked');
+            } else if (postData.alreadyCommented) {
+              reasons.push('already commented');
+            }
+            
+            if (likesCount >= targetLikes && commentsCount >= targetComments) {
+              reasons.push('all quotas reached');
+            } else if (likesCount >= targetLikes) {
+              reasons.push('like quota reached');
+            } else if (commentsCount >= targetComments) {
+              reasons.push('comment quota reached');
+            }
+            
+            skipReason += reasons.join(', ');
+            this.log(`Skipping post by ${postData.author}: ${skipReason}`, 'info');
             skippedCount++;
             continue;
           }
@@ -400,16 +435,18 @@ class LinkedInBot {
   }
 
   isAlreadyEngaged(postElement) {
-    // Check if WE already liked this post (liked button will have active/pressed state)
-    const likeButton = postElement.querySelector('[data-control-name="like"]') ||
-                      postElement.querySelector('button[aria-label*="like"]') ||
-                      postElement.querySelector('.react-button__trigger');
+    // Check if WE already liked this post - enhanced detection
+    const likeButton = this.findLikeButton(postElement);
     
     const alreadyLiked = likeButton && (
       likeButton.classList.contains('react-button__trigger--active') ||
       likeButton.classList.contains('reactions-react-button--active') ||
+      likeButton.classList.contains('artdeco-button--primary') ||
       likeButton.getAttribute('aria-pressed') === 'true' ||
-      likeButton.querySelector('.reaction-button--active')
+      likeButton.querySelector('.reaction-button--active') ||
+      likeButton.querySelector('[data-test-icon="thumbs-up-filled-icon"]') ||
+      likeButton.textContent.toLowerCase().includes('liked') ||
+      likeButton.classList.contains('active')
     );
     
     // Check if WE already commented - look for our own comments specifically
@@ -418,26 +455,58 @@ class LinkedInBot {
     let alreadyCommented = false;
     
     if (currentUserName) {
-      // Look for comment items that belong to the current user
-      const commentItems = postElement.querySelectorAll('.comments-comment-item');
+      // Look for comment items that belong to the current user - enhanced detection
+      const commentItems = postElement.querySelectorAll('.comments-comment-item, .comment-item, .feed-shared-comments-list .comment, .comments-comment-item-content-body');
       
       for (const comment of commentItems) {
-        const commentAuthor = comment.querySelector('.comments-comment-item__commenter-identity .hoverable-link-text, .comments-comment-item__commenter .hoverable-link-text');
-        if (commentAuthor && commentAuthor.textContent.trim().toLowerCase().includes(currentUserName.toLowerCase())) {
+        // Try multiple selectors for comment author names
+        const commentAuthor = comment.querySelector('.comments-comment-item__commenter-identity .hoverable-link-text') ||
+                             comment.querySelector('.comments-comment-item__commenter .hoverable-link-text') ||
+                             comment.querySelector('.comment-commenter-name') ||
+                             comment.querySelector('.feed-shared-actor__title') ||
+                             comment.querySelector('.comment-author') ||
+                             comment.querySelector('[data-control-name="commenter_profile"]');
+        
+        if (commentAuthor) {
+          const authorText = commentAuthor.textContent.trim().toLowerCase();
+          const userNameLower = currentUserName.toLowerCase();
+          
+          // Check if the author name matches (full or partial match)
+          if (authorText.includes(userNameLower) || userNameLower.includes(authorText)) {
+            alreadyCommented = true;
+            this.log(`Found existing comment by ${currentUserName} in post`);
+            break;
+          }
+        }
+      }
+      
+      // Also check for "You commented" text indicators
+      const youCommentedIndicators = postElement.querySelectorAll('.social-counts-reactions__count-text, .feed-shared-social-counts, .social-counts-reactions');
+      for (const indicator of youCommentedIndicators) {
+        if (indicator.textContent.toLowerCase().includes('you commented') || 
+            indicator.textContent.toLowerCase().includes('you and')) {
           alreadyCommented = true;
+          this.log(`Found "you commented" indicator in post`);
           break;
         }
       }
     } else {
-      // Fallback: be more conservative - if there are any comments, assume we might have commented
-      // This is less accurate but safer than the old logic
-      alreadyCommented = false; // Don't skip based on others' comments
+      // If we can't detect the username, be conservative and don't skip
+      alreadyCommented = false;
+      this.log('Could not detect current user - will not skip based on comments');
     }
     
-    return {
+    const result = {
       liked: !!alreadyLiked,
       commented: alreadyCommented
     };
+    
+    // Log engagement detection for debugging
+    if (result.liked || result.commented) {
+      this.log(`Engagement detected - Liked: ${result.liked}, Commented: ${result.commented}`);
+    }
+    
+    return result;
   }
   
   getCurrentUserName() {
@@ -513,15 +582,19 @@ class LinkedInBot {
         throw new Error('Like button not found');
       }
 
-      // Check if already liked
+      // Enhanced check if already liked - should match the detection in isAlreadyEngaged
       const isLiked = likeButton.getAttribute('aria-pressed') === 'true' ||
                      likeButton.classList.contains('artdeco-button--primary') ||
+                     likeButton.classList.contains('react-button__trigger--active') ||
+                     likeButton.classList.contains('reactions-react-button--active') ||
                      likeButton.querySelector('[data-test-icon="thumbs-up-filled-icon"]') ||
-                     likeButton.textContent.toLowerCase().includes('liked');
+                     likeButton.querySelector('.reaction-button--active') ||
+                     likeButton.textContent.toLowerCase().includes('liked') ||
+                     likeButton.classList.contains('active');
 
       if (isLiked) {
-        this.log(`Post by ${postData.author} already liked, skipping`);
-        return;
+        this.log(`Post by ${postData.author} already liked, skipping like action`, 'info');
+        return false; // Return false to indicate no action taken
       }
 
       // Click the like button
@@ -531,11 +604,16 @@ class LinkedInBot {
       // Verify the like was successful
       const nowLiked = likeButton.getAttribute('aria-pressed') === 'true' ||
                       likeButton.classList.contains('artdeco-button--primary') ||
+                      likeButton.classList.contains('react-button__trigger--active') ||
                       likeButton.querySelector('[data-test-icon="thumbs-up-filled-icon"]');
 
       if (!nowLiked) {
-        this.log(`Warning: Could not verify like on post by ${postData.author}`);
+        this.log(`Warning: Could not verify like on post by ${postData.author}`, 'warning');
+      } else {
+        this.log(`✓ Successfully liked post by ${postData.author}`, 'success');
       }
+      
+      return true; // Return true to indicate action was taken
 
     } catch (error) {
       throw new Error(`Failed to like post: ${error.message}`);
@@ -643,6 +721,13 @@ class LinkedInBot {
 
   async postComment(postData, comment) {
     try {
+      // Double-check if we've already commented on this post before proceeding
+      const currentEngagement = this.isAlreadyEngaged(postData.element);
+      if (currentEngagement.commented) {
+        this.log(`Detected existing comment during posting attempt - skipping comment on post by ${postData.author}`, 'info');
+        return false;
+      }
+      
       // Scroll post into view
       postData.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       await this.delay(CONFIG.DELAYS.SCROLL);

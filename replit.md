@@ -6,6 +6,13 @@ This is a Chrome browser extension that automates LinkedIn engagement through AI
 
 ## Recent Changes (August 26, 2025)
 
+### Enhanced Duplicate Detection - Smart Engagement Tracking
+- **Improved Like Detection**: Enhanced algorithms detect already-liked posts using multiple UI state indicators
+- **Advanced Comment Detection**: Multi-layered comment checking using user name matching and LinkedIn indicators
+- **Comprehensive Logging**: Detailed skip reasons logged for already engaged posts (liked/commented)
+- **Double-Check Validation**: Real-time re-validation before posting to prevent duplicate actions
+- **Better User Feedback**: Clear activity log messages show why posts are skipped with specific reasons
+
 ### Modern UI Redesign - Attractive & Simplified Interface
 - **Professional Design**: Complete UI overhaul with modern card-based layout and glassmorphism effects
 - **LinkedIn Branding**: Official LinkedIn colors and professional typography (Inter font)
