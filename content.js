@@ -11,6 +11,7 @@ class LinkedInBot {
       errors: 0
     };
     this.processedPosts = new Set();
+    this.processedPostsEngagement = new Map(); // Track what we've done to each post
     this.setupMessageListener();
     
     // Wait for page to be fully loaded
@@ -64,6 +65,12 @@ class LinkedInBot {
     this.config = config;
     this.isRunning = true;
     this.processedPosts.clear();
+    
+    // Initialize engagement tracking map
+    if (!this.processedPostsEngagement) {
+      this.processedPostsEngagement = new Map();
+    }
+    this.processedPostsEngagement.clear();
     
     this.log('Starting LinkedIn engagement bot...');
     this.updateStatus('Running - Scanning for posts...');
@@ -197,12 +204,26 @@ class LinkedInBot {
             continue;
           }
           
+          // FINAL SAFETY CHECK - re-validate engagement before processing
+          const finalEngagement = this.isAlreadyEngaged(postElement);
+          if (finalEngagement.liked || finalEngagement.commented) {
+            this.log(`⚠️ FINAL CHECK: Post by ${postData.author} shows engagement - ABORTING all actions`, 'warning');
+            skippedCount++;
+            continue;
+          }
+          
           // Process the post with determined actions
           const result = await this.processPostSequentially(postData, actions);
           
           if (result.liked) {
             likesCount++;
             this.log(`✓ Liked post ${likesCount}/${targetLikes} by ${postData.author}`);
+            
+            // Track this post as liked in our memory
+            if (!this.processedPostsEngagement.has(postData.id)) {
+              this.processedPostsEngagement.set(postData.id, { liked: false, commented: false });
+            }
+            this.processedPostsEngagement.get(postData.id).liked = true;
           }
           
           if (result.commented) {
@@ -214,6 +235,12 @@ class LinkedInBot {
               adaptiveCommentCount++;
               this.log(`✓ Posted adaptive comment ${adaptiveCommentCount}/${targetAdaptive} on post by ${postData.author}`);
             }
+            
+            // Track this post as commented in our memory
+            if (!this.processedPostsEngagement.has(postData.id)) {
+              this.processedPostsEngagement.set(postData.id, { liked: false, commented: false });
+            }
+            this.processedPostsEngagement.get(postData.id).commented = true;
           }
           
           processedInThisBatch = true;
@@ -450,50 +477,108 @@ class LinkedInBot {
     );
     
     // Check if WE already commented - look for our own comments specifically
-    // Get the current user's name/profile info from LinkedIn's header or navigation
-    const currentUserName = this.getCurrentUserName();
+    // COMPREHENSIVE comment detection - use multiple methods
     let alreadyCommented = false;
     
-    if (currentUserName) {
-      // Look for comment items that belong to the current user - enhanced detection
-      const commentItems = postElement.querySelectorAll('.comments-comment-item, .comment-item, .feed-shared-comments-list .comment, .comments-comment-item-content-body');
+    // Method 1: Check if ANY comment button shows "commented" state
+    const commentButton = this.findCommentButton(postElement);
+    if (commentButton) {
+      const commentButtonText = commentButton.textContent.toLowerCase();
+      const commentButtonClass = commentButton.className;
+      const commentButtonPressed = commentButton.getAttribute('aria-pressed') === 'true';
+      
+      if (commentButtonPressed || commentButtonText.includes('commented') || 
+          commentButtonClass.includes('active') || commentButtonClass.includes('pressed')) {
+        alreadyCommented = true;
+        this.log(`Detected commented state from comment button - already commented`);
+      }
+    }
+    
+    // Method 2: Check for "You commented" or "You and X others commented" text anywhere in the post
+    const allTextElements = postElement.querySelectorAll('*');
+    for (const element of allTextElements) {
+      const text = element.textContent?.toLowerCase() || '';
+      if (text.includes('you commented') || text.includes('you and ') && text.includes('commented')) {
+        alreadyCommented = true;
+        this.log(`Found "you commented" text indicator - already commented`);
+        break;
+      }
+    }
+    
+    // Method 3: Check comment count changes - look for active comment indicators
+    const commentCounts = postElement.querySelectorAll('.social-counts-reactions__count-text, .social-counts-reactions__comment-text, .feed-shared-social-counts');
+    for (const countElement of commentCounts) {
+      const countText = countElement.textContent?.toLowerCase() || '';
+      if (countText.includes('you') && countText.includes('comment')) {
+        alreadyCommented = true;
+        this.log(`Found active comment indicator in counts - already commented`);
+        break;
+      }
+    }
+    
+    // Method 4: User name detection (fallback method)
+    const currentUserName = this.getCurrentUserName();
+    if (!alreadyCommented && currentUserName) {
+      const commentItems = postElement.querySelectorAll('.comments-comment-item, .comment-item, .comments-comment-item-content');
       
       for (const comment of commentItems) {
-        // Try multiple selectors for comment author names
-        const commentAuthor = comment.querySelector('.comments-comment-item__commenter-identity .hoverable-link-text') ||
-                             comment.querySelector('.comments-comment-item__commenter .hoverable-link-text') ||
-                             comment.querySelector('.comment-commenter-name') ||
-                             comment.querySelector('.feed-shared-actor__title') ||
-                             comment.querySelector('.comment-author') ||
-                             comment.querySelector('[data-control-name="commenter_profile"]');
+        const commentAuthorElements = comment.querySelectorAll('a, span, .hoverable-link-text, [data-control-name="commenter_profile"]');
         
-        if (commentAuthor) {
-          const authorText = commentAuthor.textContent.trim().toLowerCase();
+        for (const authorElement of commentAuthorElements) {
+          const authorText = authorElement.textContent?.trim().toLowerCase() || '';
           const userNameLower = currentUserName.toLowerCase();
           
-          // Check if the author name matches (full or partial match)
-          if (authorText.includes(userNameLower) || userNameLower.includes(authorText)) {
+          // Strict name matching - must be exact or very close
+          if (authorText === userNameLower || 
+              (authorText.length > 3 && userNameLower.length > 3 && authorText.includes(userNameLower))) {
             alreadyCommented = true;
-            this.log(`Found existing comment by ${currentUserName} in post`);
+            this.log(`Found existing comment by user ${currentUserName} - already commented`);
             break;
           }
         }
+        if (alreadyCommented) break;
       }
+    }
+    
+    // Method 5: Check if the post element itself has commented state classes
+    if (!alreadyCommented) {
+      const postClasses = postElement.className || '';
+      if (postClasses.includes('commented') || postClasses.includes('user-commented')) {
+        alreadyCommented = true;
+        this.log(`Found commented state in post classes - already commented`);
+      }
+    }
+    
+    // Method 6: AGGRESSIVE SCAN - Look for ANY form of "you" + "comment" combination
+    if (!alreadyCommented) {
+      const postHTML = postElement.innerHTML.toLowerCase();
+      const patterns = [
+        /you\s+commented/i,
+        /you\s+and\s+\d+\s+others?\s+commented/i,
+        /you.*comment/i,
+        /commented.*you/i
+      ];
       
-      // Also check for "You commented" text indicators
-      const youCommentedIndicators = postElement.querySelectorAll('.social-counts-reactions__count-text, .feed-shared-social-counts, .social-counts-reactions');
-      for (const indicator of youCommentedIndicators) {
-        if (indicator.textContent.toLowerCase().includes('you commented') || 
-            indicator.textContent.toLowerCase().includes('you and')) {
+      for (const pattern of patterns) {
+        if (pattern.test(postHTML)) {
           alreadyCommented = true;
-          this.log(`Found "you commented" indicator in post`);
+          this.log(`AGGRESSIVE DETECTION: Found comment pattern in post HTML - already commented`);
           break;
         }
       }
-    } else {
-      // If we can't detect the username, be conservative and don't skip
-      alreadyCommented = false;
-      this.log('Could not detect current user - will not skip based on comments');
+    }
+    
+    // Method 7: Check for processed post tracking (internal memory)
+    const postId = postElement.getAttribute('data-urn') || 
+                  postElement.getAttribute('data-id') ||
+                  this.generatePostId(postElement.textContent, postElement);
+    
+    if (this.processedPostsEngagement && this.processedPostsEngagement.has(postId)) {
+      const engagement = this.processedPostsEngagement.get(postId);
+      if (engagement.commented) {
+        alreadyCommented = true;
+        this.log(`MEMORY CHECK: Post already processed and commented - already commented`);
+      }
     }
     
     const result = {
