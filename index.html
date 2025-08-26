@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn AI Engagement Bot - Chrome Extension</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #0077b5;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 18px;
+        }
+        .section {
+            margin: 25px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #0077b5;
+        }
+        .section h2 {
+            color: #333;
+            margin-top: 0;
+        }
+        .download-btn {
+            display: inline-block;
+            background: #0077b5;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 10px 10px 0;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .download-btn:hover {
+            background: #005885;
+        }
+        .feature-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        .feature-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #28a745;
+            font-weight: bold;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .warning strong {
+            color: #856404;
+        }
+        .file-list {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+        .installation-step {
+            background: white;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .step-number {
+            background: #0077b5;
+            color: white;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LinkedIn AI Engagement Bot</h1>
+        <p class="subtitle">Chrome Extension for Automated LinkedIn Engagement</p>
+        
+        <div class="section">
+            <h2>🚀 Features</h2>
+            <ul class="feature-list">
+                <li>AI-powered comment generation using OpenAI GPT-4o</li>
+                <li>Smart adaptive responses based on post content</li>
+                <li>Automatic post liking with duplicate detection</li>
+                <li>Human-like behavior with randomized delays</li>
+                <li>Advertisement detection and skipping</li>
+                <li>Configurable engagement limits and styles</li>
+                <li>Real-time statistics and progress tracking</li>
+            </ul>
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ Important:</strong> This extension requires an OpenAI API key to function. You'll need to configure it after installation through the extension popup.
+        </div>
+
+        <div class="section">
+            <h2>📦 Download Extension Files</h2>
+            <p>Download the extension files to install in Chrome:</p>
+            
+            <div class="file-list">
+                Extension Package Contents:
+                <br>• manifest.json - Extension configuration
+                <br>• popup.html/css/js - Control interface
+                <br>• content.js - LinkedIn page automation
+                <br>• background.js - API communication
+                <br>• config.js - Settings management
+                <br>• icon16.svg - Extension icon
+            </div>
+
+            <a href="/manifest.json" class="download-btn" download>manifest.json</a>
+            <a href="/popup.html" class="download-btn" download>popup.html</a>
+            <a href="/popup.css" class="download-btn" download>popup.css</a>
+            <a href="/popup.js" class="download-btn" download>popup.js</a>
+            <a href="/content.js" class="download-btn" download>content.js</a>
+            <a href="/background.js" class="download-btn" download>background.js</a>
+            <a href="/config.js" class="download-btn" download>config.js</a>
+            <a href="/icon16.svg" class="download-btn" download>icon16.svg</a>
+        </div>
+
+        <div class="section">
+            <h2>🔧 Installation Instructions</h2>
+            
+            <div class="installation-step">
+                <span class="step-number">1</span>
+                <strong>Download all files</strong> using the buttons above to a local folder on your computer
+            </div>
+            
+            <div class="installation-step">
+                <span class="step-number">2</span>
+                <strong>Open Chrome</strong> and navigate to <code>chrome://extensions/</code>
+            </div>
+            
+            <div class="installation-step">
+                <span class="step-number">3</span>
+                <strong>Enable Developer Mode</strong> by toggling the switch in the top right corner
+            </div>
+            
+            <div class="installation-step">
+                <span class="step-number">4</span>
+                <strong>Click "Load unpacked"</strong> and select the folder containing the downloaded files
+            </div>
+            
+            <div class="installation-step">
+                <span class="step-number">5</span>
+                <strong>Configure API Key:</strong> Click the extension icon and enter your OpenAI API key
+            </div>
+            
+            <div class="installation-step">
+                <span class="step-number">6</span>
+                <strong>Visit LinkedIn</strong> and use the extension popup to start automated engagement
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>⚙️ Configuration</h2>
+            <p>After installation, configure these settings through the extension popup:</p>
+            <ul class="feature-list">
+                <li>OpenAI API Key (required)</li>
+                <li>Maximum posts to engage with (1-100)</li>
+                <li>Engagement types (likes and/or comments)</li>
+                <li>Delay ranges for human-like behavior</li>
+                <li>Comment style preferences</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>🔒 Security & Privacy</h2>
+            <ul class="feature-list">
+                <li>API keys stored securely in Chrome's sync storage</li>
+                <li>No data sent to external servers except OpenAI API</li>
+                <li>Content script runs in isolation from LinkedIn</li>
+                <li>Comprehensive error handling and logging</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
