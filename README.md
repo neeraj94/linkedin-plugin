@@ -13,6 +13,7 @@ A Chrome extension that automatically finds posts in your LinkedIn feed, generat
 - 📊 **Real-time Analytics**: Live statistics for posts found, liked, and commented
 - 💾 **Smart Settings**: Persistent configuration with automatic saving
 - 🎲 **Randomized Delays**: Custom delay ranges for natural interaction patterns
+- 🔗 **Influencer Connections**: Searches for top influencers and sends connection requests to the top 10
 
 ## Installation
 

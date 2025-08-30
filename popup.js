@@ -33,6 +33,7 @@ class PopupController {
       delayMin: document.getElementById('delayMin'),
       delayMax: document.getElementById('delayMax'),
       startBot: document.getElementById('startBot'),
+      connectInfluencers: document.getElementById('connectInfluencers'),
       stopBot: document.getElementById('stopBot'),
       downloadLogs: document.getElementById('downloadLogs'),
       status: document.getElementById('status'),
@@ -111,6 +112,7 @@ class PopupController {
     this.elements.saveKey.addEventListener('click', () => this.saveApiKey());
     this.elements.toggleKey.addEventListener('click', () => this.toggleApiKeyVisibility());
     this.elements.startBot.addEventListener('click', () => this.startBot());
+    this.elements.connectInfluencers.addEventListener('click', () => this.connectInfluencers());
     this.elements.stopBot.addEventListener('click', () => this.stopBot());
     this.elements.downloadLogs.addEventListener('click', () => this.downloadGlobalLogs());
     
@@ -405,6 +407,41 @@ class PopupController {
     } catch (error) {
       this.addLog('Error stopping bot: ' + error.message, 'error');
       this.handleBotStopped(); // Force stop UI state
+    }
+  }
+
+  async connectInfluencers() {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+      if (!tab.url.includes('linkedin.com')) {
+        this.addLog('Please navigate to LinkedIn first', 'error');
+        return;
+      }
+
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['config.js', 'content.js']
+        });
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (scriptError) {
+        console.log('Content script injection result:', scriptError.message);
+      }
+
+      await chrome.tabs.sendMessage(tab.id, { type: 'CONNECT_TOP_INFLUENCERS' }, (response) => {
+        if (chrome.runtime.lastError) {
+          this.addLog('Error: ' + chrome.runtime.lastError.message, 'error');
+          return;
+        }
+        if (response && response.success) {
+          this.addLog(response.message || 'Connection requests sent', 'success');
+        } else {
+          this.addLog(response?.message || 'Failed to connect influencers', 'error');
+        }
+      });
+    } catch (error) {
+      this.addLog('Error connecting influencers: ' + error.message, 'error');
     }
   }
 
