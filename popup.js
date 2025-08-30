@@ -21,6 +21,7 @@ class PopupController {
     this.elements = {
       apiKey: document.getElementById('apiKey'),
       saveKey: document.getElementById('saveKey'),
+      toggleKey: document.getElementById('toggleKey'),
       maxPosts: document.getElementById('maxPosts'),
       maxLikes: document.getElementById('maxLikes'),
       singleWordComments: document.getElementById('singleWordComments'),
@@ -108,6 +109,7 @@ class PopupController {
 
   setupEventListeners() {
     this.elements.saveKey.addEventListener('click', () => this.saveApiKey());
+    this.elements.toggleKey.addEventListener('click', () => this.toggleApiKeyVisibility());
     this.elements.startBot.addEventListener('click', () => this.startBot());
     this.elements.stopBot.addEventListener('click', () => this.stopBot());
     this.elements.downloadLogs.addEventListener('click', () => this.downloadGlobalLogs());
@@ -182,6 +184,13 @@ class PopupController {
     } catch (error) {
       this.addLog('Error saving API key: ' + error.message, 'error');
     }
+  }
+
+  toggleApiKeyVisibility() {
+    const field = this.elements.apiKey;
+    const isHidden = field.type === 'password';
+    field.type = isHidden ? 'text' : 'password';
+    this.elements.toggleKey.textContent = isHidden ? 'Hide' : 'Show';
   }
 
   // Comment Split Logic Methods
