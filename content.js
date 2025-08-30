@@ -44,6 +44,11 @@ class LinkedInBot {
             // Health check message
             sendResponse({ success: true, message: 'Content script is active' });
             break;
+          case 'CONNECT_TOP_INFLUENCERS':
+            this.connectTopInfluencers()
+              .then(() => sendResponse({ success: true, message: 'Connection requests sent' }))
+              .catch(error => sendResponse({ success: false, message: error.message }));
+            break;
           default:
             sendResponse({ success: false, message: `Unknown message type: ${message.type}` });
         }
@@ -89,6 +94,59 @@ class LinkedInBot {
     this.isRunning = false;
     this.log('Bot stopped');
     this.sendMessage({ type: 'BOT_STOPPED' });
+  }
+
+  async connectTopInfluencers() {
+    this.log('Searching for top influencers...');
+    try {
+      const posts = document.querySelectorAll('article, div.feed-shared-update-v2');
+      const candidates = [];
+
+      posts.forEach(post => {
+        const buttons = Array.from(post.querySelectorAll('button'));
+        const connectBtn = buttons.find(btn => {
+          const text = btn.textContent.trim();
+          const label = btn.getAttribute('aria-label') || '';
+          return text === 'Connect' || label.includes('Connect');
+        });
+        if (!connectBtn) return;
+
+        let reactions = 0;
+        const reactionEl = post.querySelector('.social-details-social-counts__reactions-count, span[aria-label*=" reactions"]');
+        if (reactionEl) {
+          const match = reactionEl.innerText.replace(/,/g, '').match(/\d+/);
+          if (match) reactions = parseInt(match[0], 10);
+        }
+        candidates.push({ button: connectBtn, reactions });
+      });
+
+      if (candidates.length === 0) {
+        this.log('No influencers found to connect', 'error');
+        throw new Error('No influencers found');
+      }
+
+      candidates.sort((a, b) => b.reactions - a.reactions);
+      const topTen = candidates.slice(0, 10);
+
+      for (const inf of topTen) {
+        inf.button.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await this.delay(this.getRandomDelay(1, 2) * 1000);
+        inf.button.click();
+
+        const sendBtn = await this.waitForElement("button[aria-label='Send now']", 3000);
+        if (sendBtn) {
+          await this.delay(200);
+          sendBtn.click();
+        }
+
+        await this.delay(this.getRandomDelay(1, 2) * 1000);
+      }
+
+      this.log(`Sent connection requests to ${topTen.length} influencers`, 'success');
+    } catch (error) {
+      this.log('Influencer connection error: ' + error.message, 'error');
+      throw error;
+    }
   }
 
   async processFeedPosts() {
